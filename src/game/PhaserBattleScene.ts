@@ -6,23 +6,20 @@ export type BattleBoardSnapshot = Pick<
   'matchId' | 'phase' | 'turn' | 'winner' | 'pendingNpc' | 'playerActive' | 'npcActive'
 >;
 
-type CardVisualGroup = {
-  panel: Phaser.GameObjects.Rectangle;
+type ZoneGroup = {
+  plate: Phaser.GameObjects.Rectangle;
   glow: Phaser.GameObjects.Rectangle;
-  status: Phaser.GameObjects.Text;
-  title: Phaser.GameObjects.Text;
-  hp: Phaser.GameObjects.Text;
-  energy: Phaser.GameObjects.Text;
-  attack: Phaser.GameObjects.Text;
+  label: Phaser.GameObjects.Text;
+  detail: Phaser.GameObjects.Text;
 };
 
 export class PhaserBattleScene extends Phaser.Scene {
   private snapshot: BattleBoardSnapshot | null = null;
-  private playerCard?: CardVisualGroup;
-  private npcCard?: CardVisualGroup;
-  private boardTitle?: Phaser.GameObjects.Text;
+  private npcZone?: ZoneGroup;
+  private playerZone?: ZoneGroup;
   private boardMeta?: Phaser.GameObjects.Text;
   private boardResult?: Phaser.GameObjects.Text;
+  private fxLayer?: Phaser.GameObjects.Graphics;
   private isReady = false;
 
   constructor() {
@@ -30,31 +27,53 @@ export class PhaserBattleScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#08111f');
+    this.cameras.main.setBackgroundColor('#071326');
 
-    const frame = this.add.rectangle(360, 230, 696, 420, 0x10213b, 0.94);
-    frame.setStrokeStyle(2, 0x91deff, 0.16);
+    this.add.rectangle(640, 380, 1220, 720, 0x071326, 0.96);
+    this.add.circle(640, 160, 200, 0x2db8ff, 0.06);
+    this.add.circle(640, 600, 240, 0x76eecf, 0.06);
 
-    this.add.rectangle(360, 120, 640, 2, 0x91deff, 0.18);
+    const arena = this.add.graphics();
+    arena.lineStyle(2, 0x5dcaff, 0.14);
+    arena.fillStyle(0x0c1c36, 0.74);
+    arena.beginPath();
+    arena.moveTo(160, 186);
+    arena.lineTo(1120, 186);
+    arena.lineTo(1040, 618);
+    arena.lineTo(240, 618);
+    arena.closePath();
+    arena.fillPath();
+    arena.strokePath();
 
-    this.boardTitle = this.add.text(40, 30, 'Mesa Phaser · solo lectura', {
+    const grid = this.add.graphics();
+    grid.lineStyle(1, 0x7ef0c3, 0.08);
+    for (let x = 240; x <= 1040; x += 70) {
+      grid.lineBetween(x, 220, x - 40, 590);
+    }
+    for (let y = 230; y <= 570; y += 46) {
+      grid.lineBetween(220, y, 1060, y);
+    }
+
+    const lane = this.add.graphics();
+    lane.lineStyle(2, 0x7ef0c3, 0.18);
+    lane.strokeEllipse(640, 398, 280, 74);
+    lane.strokeEllipse(640, 398, 420, 110);
+
+    this.boardMeta = this.add.text(48, 36, 'Turno del jugador · Arena estable', {
+      fontFamily: '"IBM Plex Sans", sans-serif',
+      fontSize: '18px',
+      color: '#9eb6cf',
+    });
+
+    this.boardResult = this.add.text(48, 66, '', {
       fontFamily: '"Chakra Petch", sans-serif',
-      fontSize: '26px',
-      color: '#e8f2ff',
-    });
-    this.boardMeta = this.add.text(40, 64, 'Esperando snapshot...', {
-      fontFamily: '"IBM Plex Sans", sans-serif',
-      fontSize: '14px',
-      color: '#9fb4d1',
-    });
-    this.boardResult = this.add.text(40, 92, '', {
-      fontFamily: '"IBM Plex Sans", sans-serif',
-      fontSize: '15px',
-      color: '#89f0b5',
+      fontSize: '28px',
+      color: '#7ef0c3',
     });
 
-    this.npcCard = this.createCardGroup(360, 158, 'Activo NPC');
-    this.playerCard = this.createCardGroup(360, 284, 'Activo jugador');
+    this.npcZone = this.createZone(640, 220, 'RIVAL', 'Esperando respuesta');
+    this.playerZone = this.createZone(640, 560, 'JUGADOR', 'Seleccioná tu activo');
+    this.fxLayer = this.add.graphics();
 
     this.isReady = true;
 
@@ -74,142 +93,188 @@ export class PhaserBattleScene extends Phaser.Scene {
     this.renderSnapshot(snapshot, previous);
   }
 
-  private createCardGroup(x: number, y: number, fallbackStatus: string): CardVisualGroup {
-    const glow = this.add.rectangle(x, y, 600, 96, 0x89f0b5, 0.08);
-    glow.setStrokeStyle(2, 0x89f0b5, 0.18);
+  private createZone(x: number, y: number, label: string, detail: string): ZoneGroup {
+    const glow = this.add.rectangle(x, y, 520, 120, 0x2db8ff, 0.03);
+    glow.setStrokeStyle(2, 0x2db8ff, 0.14);
 
-    const panel = this.add.rectangle(x, y, 588, 84, 0x132541, 0.95);
-    panel.setStrokeStyle(2, 0x91deff, 0.14);
+    const plate = this.add.rectangle(x, y, 460, 92, 0x10213b, 0.84);
+    plate.setStrokeStyle(2, 0x83dbff, 0.2);
 
-    const status = this.add.text(88, y - 28, fallbackStatus, {
-      fontFamily: '"IBM Plex Sans", sans-serif',
-      fontSize: '13px',
-      color: '#9fb4d1',
-    });
-    const title = this.add.text(88, y - 4, 'Sin Pokémon activo', {
+    const zoneLabel = this.add.text(x, y - 18, label, {
       fontFamily: '"Chakra Petch", sans-serif',
-      fontSize: '24px',
-      color: '#e8f2ff',
+      fontSize: '28px',
+      color: '#ebf7ff',
     });
-    const hp = this.add.text(88, y + 24, 'HP —', {
-      fontFamily: '"IBM Plex Sans", sans-serif',
-      fontSize: '16px',
-      color: '#e8f2ff',
-    });
-    const energy = this.add.text(288, y + 24, 'Energía —', {
-      fontFamily: '"IBM Plex Sans", sans-serif',
-      fontSize: '16px',
-      color: '#89f0b5',
-    });
-    const attack = this.add.text(448, y + 24, 'Ataque —', {
-      fontFamily: '"IBM Plex Sans", sans-serif',
-      fontSize: '16px',
-      color: '#7dd3fc',
-    });
+    zoneLabel.setOrigin(0.5);
 
-    return { panel, glow, status, title, hp, energy, attack };
+    const zoneDetail = this.add.text(x, y + 18, detail, {
+      fontFamily: '"IBM Plex Sans", sans-serif',
+      fontSize: '18px',
+      color: '#9eb6cf',
+    });
+    zoneDetail.setOrigin(0.5);
+
+    return { plate, glow, label: zoneLabel, detail: zoneDetail };
   }
 
   private renderSnapshot(snapshot: BattleBoardSnapshot, previous: BattleBoardSnapshot | null) {
     this.renderMeta(snapshot);
-    this.renderBattler(this.npcCard, snapshot.npcActive, snapshot.pendingNpc ? 'NPC pensando…' : 'Activo NPC');
-    this.renderBattler(
-      this.playerCard,
-      snapshot.playerActive,
-      snapshot.phase === 'selecting-active' ? 'Esperando selección' : 'Activo jugador',
-    );
+    this.renderZone(this.npcZone, snapshot.npcActive, snapshot.pendingNpc ? 'Cargando acción rival' : 'Carta rival en posición');
+    this.renderZone(this.playerZone, snapshot.playerActive, snapshot.phase === 'selecting-active' ? 'Elegí tu carta activa' : 'Carta lista para jugar');
     this.renderTurnGlow(snapshot);
     this.renderAttackFeedback(previous, snapshot);
   }
 
   private renderMeta(snapshot: BattleBoardSnapshot) {
-    this.boardMeta?.setText(
-      `Turno: ${snapshot.turn === 'player' ? 'Jugador' : 'NPC'} · Fase: ${snapshot.phase}`,
-    );
+    const phaseMap: Record<BattleBoardSnapshot['phase'], string> = {
+      loading: 'Carga',
+      'selecting-active': 'Elegir carta',
+      'player-turn': 'Turno del jugador',
+      'npc-turn': 'Turno del rival',
+      'game-over': 'Final',
+    };
+
+    this.boardMeta?.setText(`${snapshot.turn === 'player' ? 'Jugador' : 'NPC'} · ${phaseMap[snapshot.phase]}`);
 
     if (snapshot.winner === 'player') {
-      this.boardResult?.setText('Victoria del jugador.');
-      this.boardResult?.setColor('#89f0b5');
+      this.boardResult?.setText('VICTORIA');
+      this.boardResult?.setColor('#7ef0c3');
       return;
     }
 
     if (snapshot.winner === 'npc') {
-      this.boardResult?.setText('El NPC cerró la partida.');
-      this.boardResult?.setColor('#ff8d8d');
+      this.boardResult?.setText('DERROTA');
+      this.boardResult?.setColor('#ff7b9f');
       return;
     }
 
     this.boardResult?.setText('');
   }
 
-  private renderBattler(card: CardVisualGroup | undefined, battler: Battler | null, status: string) {
-    if (!card) {
+  private renderZone(zone: ZoneGroup | undefined, battler: Battler | null, fallback: string) {
+    if (!zone) {
       return;
     }
 
     if (!battler) {
-      card.status.setText(status);
-      card.title.setText('Sin Pokémon activo');
-      card.hp.setText('HP —');
-      card.energy.setText('Energía —');
-      card.attack.setText('Ataque —');
+      zone.label.setText(zone === this.playerZone ? 'JUGADOR' : 'RIVAL');
+      zone.detail.setText(fallback);
       return;
     }
 
-    card.status.setText(status);
-    card.title.setText(battler.name);
-    card.hp.setText(`HP ${battler.currentHp}/${battler.hp}`);
-    card.energy.setText(`Energía ${battler.energy}/${battler.attackCost}`);
-    card.attack.setText(`${battler.attackName} · ${battler.attackDamage}`);
+    zone.label.setText(battler.name.toUpperCase());
+    zone.detail.setText(`HP ${battler.currentHp}/${battler.hp} · ENERGÍA ${battler.energy}/${battler.attackCost}`);
   }
 
   private renderTurnGlow(snapshot: BattleBoardSnapshot) {
-    if (!this.playerCard || !this.npcCard) {
+    if (!this.playerZone || !this.npcZone) {
       return;
     }
 
     const playerTurn = snapshot.turn === 'player' && !snapshot.winner;
     const npcTurn = snapshot.turn === 'npc' && !snapshot.winner;
 
-    this.playerCard.glow.setFillStyle(playerTurn ? 0x89f0b5 : 0x91deff, playerTurn ? 0.12 : 0.03);
-    this.playerCard.glow.setStrokeStyle(2, playerTurn ? 0x89f0b5 : 0x91deff, playerTurn ? 0.38 : 0.12);
-    this.npcCard.glow.setFillStyle(npcTurn ? 0x7dd3fc : 0x91deff, npcTurn ? 0.12 : 0.03);
-    this.npcCard.glow.setStrokeStyle(2, npcTurn ? 0x7dd3fc : 0x91deff, npcTurn ? 0.38 : 0.12);
+    this.playerZone.glow.setFillStyle(0x7ef0c3, playerTurn ? 0.12 : 0.03);
+    this.playerZone.glow.setStrokeStyle(2, playerTurn ? 0x7ef0c3 : 0x83dbff, playerTurn ? 0.44 : 0.12);
+    this.npcZone.glow.setFillStyle(0x2db8ff, npcTurn ? 0.12 : 0.03);
+    this.npcZone.glow.setStrokeStyle(2, npcTurn ? 0x2db8ff : 0x83dbff, npcTurn ? 0.44 : 0.12);
   }
 
   private renderAttackFeedback(previous: BattleBoardSnapshot | null, current: BattleBoardSnapshot) {
-    if (!previous) {
+    if (!previous || !this.fxLayer) {
       return;
     }
 
-    const npcDamaged =
-      previous.npcActive && current.npcActive && current.npcActive.currentHp < previous.npcActive.currentHp;
-    const playerDamaged =
-      previous.playerActive && current.playerActive && current.playerActive.currentHp < previous.playerActive.currentHp;
+    this.fxLayer.clear();
 
-    if (npcDamaged && this.npcCard) {
-      this.pulsePanel(this.npcCard.panel, 0xff8d8d);
+    const npcDamage =
+      previous.npcActive && current.npcActive ? previous.npcActive.currentHp - current.npcActive.currentHp : 0;
+    const playerDamage =
+      previous.playerActive && current.playerActive ? previous.playerActive.currentHp - current.playerActive.currentHp : 0;
+
+    if (npcDamage > 0 && this.playerZone && this.npcZone) {
+      this.playAttackBurst(this.playerZone.plate, this.npcZone.plate, npcDamage, '#7ef0c3');
+      this.pulseZone(this.npcZone, 0xff7b9f);
     }
 
-    if (playerDamaged && this.playerCard) {
-      this.pulsePanel(this.playerCard.panel, 0xff8d8d);
+    if (playerDamage > 0 && this.playerZone && this.npcZone) {
+      this.playAttackBurst(this.npcZone.plate, this.playerZone.plate, playerDamage, '#2db8ff');
+      this.pulseZone(this.playerZone, 0xff7b9f);
     }
   }
 
-  private pulsePanel(panel: Phaser.GameObjects.Rectangle, color: number) {
-    panel.setStrokeStyle(3, color, 0.92);
-    this.tweens.killTweensOf(panel);
+  private pulseZone(zone: ZoneGroup, color: number) {
+    zone.plate.setStrokeStyle(3, color, 0.94);
+    this.tweens.killTweensOf(zone.plate);
     this.tweens.add({
-      targets: panel,
+      targets: zone.plate,
       duration: 260,
+      x: zone.plate.x + 8,
       yoyo: true,
-      repeat: 0,
-      ease: 'Sine.Out',
-      alpha: { from: 0.82, to: 1 },
+      repeat: 2,
+      ease: 'Sine.InOut',
       onComplete: () => {
-        panel.setStrokeStyle(2, 0x91deff, 0.14);
-        panel.setAlpha(1);
+        zone.plate.setStrokeStyle(2, 0x83dbff, 0.2);
+        zone.plate.x = zone.glow.x;
       },
+    });
+  }
+
+  private playAttackBurst(from: Phaser.GameObjects.Rectangle, to: Phaser.GameObjects.Rectangle, damage: number, color: string) {
+    if (!this.fxLayer) {
+      return;
+    }
+
+    const start = new Phaser.Math.Vector2(from.x, from.y);
+    const end = new Phaser.Math.Vector2(to.x, to.y);
+    const pulse = this.add.circle(start.x, start.y, 14, Phaser.Display.Color.HexStringToColor(color).color, 0.7);
+    const impact = this.add.circle(end.x, end.y, 18, 0xff7b9f, 0.22);
+    const damageText = this.add.text(end.x, end.y - 44, `-${damage}`, {
+      fontFamily: '"Chakra Petch", sans-serif',
+      fontSize: '36px',
+      color: '#ffb2c4',
+      stroke: '#20040f',
+      strokeThickness: 6,
+    });
+    damageText.setOrigin(0.5);
+
+    this.fxLayer.lineStyle(6, Phaser.Display.Color.HexStringToColor(color).color, 0.65);
+    this.fxLayer.beginPath();
+    this.fxLayer.moveTo(start.x, start.y);
+    this.fxLayer.lineTo(end.x, end.y);
+    this.fxLayer.strokePath();
+
+    this.tweens.add({
+      targets: pulse,
+      x: end.x,
+      y: end.y,
+      scale: 0.42,
+      alpha: 0,
+      duration: 260,
+      ease: 'Cubic.Out',
+      onComplete: () => pulse.destroy(),
+    });
+
+    this.tweens.add({
+      targets: impact,
+      scale: 2.8,
+      alpha: 0,
+      duration: 320,
+      ease: 'Quad.Out',
+      onComplete: () => impact.destroy(),
+    });
+
+    this.tweens.add({
+      targets: damageText,
+      y: damageText.y - 28,
+      alpha: 0,
+      duration: 620,
+      ease: 'Sine.Out',
+      onComplete: () => damageText.destroy(),
+    });
+
+    this.time.delayedCall(180, () => {
+      this.fxLayer?.clear();
     });
   }
 }

@@ -1,112 +1,166 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 import { loadCards } from '../features/cards/cardRepository';
 import { canAttack } from '../features/battle/gameEngine';
 import { useBattleStore } from '../features/battle/store';
-import type { GameState } from '../features/battle/types';
-import { createPhaserBattleBridge, type PhaserBattleBridge } from '../game/phaserBridge';
+import type { Battler, GameState, TurnPhase } from '../features/battle/types';
+import { ThreeArena } from '../game/ThreeArena';
 
-function PhaserBoard({ match }: { match: GameState }) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const bridgeRef = useRef<PhaserBattleBridge | null>(null);
+gsap.registerPlugin(useGSAP);
 
-  useEffect(() => {
-    let cancelled = false;
+type AttackFx = {
+  key: number;
+  attacker: 'player' | 'npc';
+  damage: number;
+};
 
-    const bootstrap = async () => {
-      if (!hostRef.current) {
-        return;
-      }
-
-      const bridge = await createPhaserBattleBridge(hostRef.current);
-
-      if (cancelled) {
-        bridge.destroy();
-        return;
-      }
-
-      bridgeRef.current = bridge;
-      bridge.sync(match);
-    };
-
-    void bootstrap();
-
-    return () => {
-      cancelled = true;
-      bridgeRef.current?.destroy();
-      bridgeRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    bridgeRef.current?.sync(match);
-  }, [match]);
-
-  return <div ref={hostRef} className="phaser-stage" aria-label="Tablero Phaser en modo solo lectura" />;
+function getPhaseLabel(phase: TurnPhase, match: GameState): string {
+  if (phase === 'selecting-active') return 'Elegir carta';
+  if (phase === 'npc-turn') return 'Turno NPC';
+  if (phase === 'game-over') return 'Final';
+  if (match.turn === 'player') return match.energyAssignedThisTurn ? 'Ataque o pase' : 'Asignar energía';
+  return 'Resolución';
 }
 
-function BattleCard({
-  title,
-  hp,
-  maxHp,
-  energy,
-  attackName,
-  attackDamage,
-  attackCost,
-  status,
-}: {
-  title: string;
-  hp: number;
-  maxHp: number;
-  energy: number;
-  attackName: string;
-  attackDamage: number;
-  attackCost: number;
-  status: string;
-}) {
-  const hpRatio = maxHp > 0 ? Math.max(0, Math.round((hp / maxHp) * 100)) : 0;
+function formatLogEntry(entry: string): string {
+  let match = entry.match(/^NPC activa a (.+)\.$/);
+  if (match) return `${match[1]} entra al campo rival.`;
+  match = entry.match(/^Elegiste a (.+) como Pokémon activo\.$/);
+  if (match) return `${match[1]} entra a tu zona activa.`;
+  match = entry.match(/^Jugador asignó 1 energía a (.+) \((\d+)\/(\d+)\)\.$/);
+  if (match) return `Energía asignada a ${match[1]} · ${match[2]}/${match[3]}.`;
+  match = entry.match(/^NPC asignó 1 energía a (.+) \((\d+)\/(\d+)\)\.$/);
+  if (match) return `El NPC cargó energía en ${match[1]} · ${match[2]}/${match[3]}.`;
+  match = entry.match(/^Jugador usó (.+) con (.+) e hizo (\d+) de daño a (.+)\.$/);
+  if (match) return `${match[2]} usó ${match[1]} y causó ${match[3]} de daño.`;
+  match = entry.match(/^NPC usó (.+) con (.+) e hizo (\d+) de daño a (.+)\.$/);
+  if (match) return `El NPC usó ${match[1]} con ${match[2]} y causó ${match[3]} de daño.`;
+  if (entry === 'Nueva partida iniciada.') return 'La arena digital está lista.';
+  if (entry === 'Victoria del jugador.') return 'Victoria.';
+  if (entry === 'Derrota del jugador.') return 'Derrota.';
+  if (entry.startsWith('Jugador pasó el turno')) return 'Fin de tu turno.';
+  if (entry.startsWith('NPC pasó el turno')) return 'El NPC pasa el turno.';
+  return entry;
+}
+
+function getMatchSummary(match: GameState) {
+  let damageDealt = 0;
+  let damageTaken = 0;
+  let passCount = 0;
+  const cardsUsed = new Set<string>();
+
+  for (const entry of match.log) {
+    let damageMatch = entry.match(/^Jugador usó .+ con (.+) e hizo (\d+) de daño a .+\.$/);
+    if (damageMatch) {
+      cardsUsed.add(damageMatch[1]);
+      damageDealt += Number.parseInt(damageMatch[2], 10);
+      continue;
+    }
+
+    damageMatch = entry.match(/^NPC usó .+ con (.+) e hizo (\d+) de daño a .+\.$/);
+    if (damageMatch) {
+      cardsUsed.add(damageMatch[1]);
+      damageTaken += Number.parseInt(damageMatch[2], 10);
+      continue;
+    }
+
+    const activeMatch = entry.match(/^(?:Elegiste a|NPC activa a) (.+?)(?: como Pokémon activo)?\.$/);
+    if (activeMatch) cardsUsed.add(activeMatch[1]);
+
+    if (entry.startsWith('Jugador pasó el turno') || entry.startsWith('NPC pasó el turno')) {
+      passCount += 1;
+    }
+  }
+
+  return {
+    damageDealt,
+    damageTaken,
+    turnsPlayed: Math.max(1, Math.ceil(passCount / 2) + (match.winner ? 1 : 0)),
+    cardsUsed: cardsUsed.size,
+  };
+}
+
+function ZonePile({ label }: { label: string }) {
+  return (
+    <div className="zone-pile">
+      <div className="zone-pile__stack" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <small>{label}</small>
+    </div>
+  );
+}
+
+function BenchSlots({ owner }: { owner: 'player' | 'npc' }) {
+  return (
+    <div className={`bench-row bench-row--${owner}`}>
+      {[1, 2, 3].map((slot) => (
+        <div key={`${owner}-bench-${slot}`} className="bench-slot">
+          <span>Banca {slot}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'player' | 'npc'; status: string }) {
+  const hpRatio = battler.hp > 0 ? Math.max(0, Math.round((battler.currentHp / battler.hp) * 100)) : 0;
+  const energySlots = Math.max(1, Math.max(battler.attackCost, battler.energy));
+  const hpTone = hpRatio <= 25 ? 'danger' : hpRatio <= 55 ? 'warning' : 'safe';
 
   return (
-    <article className="battle-card" aria-label={`${title} en juego`}>
-      <div className="battle-card-topline">
-        <div>
-          <p className="eyebrow">{status}</p>
-          <h3>{title}</h3>
-        </div>
-        <span className="counter-pill">{hp}/{maxHp} HP</span>
+    <article className={`active-card active-card--${owner}`}>
+      <div className="active-card__image">
+        <img src={battler.imageLarge || battler.imageSmall} alt={`Carta activa de ${battler.name}`} loading="lazy" />
       </div>
 
-      <div className="meter-block" aria-label={`Vida restante de ${title}`}>
-        <div className="meter-track">
-          <div className="meter-fill" style={{ width: `${hpRatio}%` }} />
+      <div className="active-card__content">
+        <div className="active-card__header">
+          <div>
+            <p className="eyebrow">{status}</p>
+            <h3>{battler.name}</h3>
+          </div>
+          <span className={`hp-pill hp-pill--${hpTone}`}>{battler.currentHp}/{battler.hp} HP</span>
+        </div>
+
+        <div className="hp-meter">
+          <div className="hp-meter__topline">
+            <span>HP</span>
+            <span>{hpRatio}%</span>
+          </div>
+          <div className="hp-meter__track">
+            <div className={`hp-meter__fill hp-meter__fill--${hpTone}`} style={{ width: `${hpRatio}%` }} />
+          </div>
+        </div>
+
+        <div className="chip-row">
+          <span className="chip chip--accent">{battler.type}</span>
+          <span className="chip">{battler.attackName}</span>
+          <span className="chip">Daño {battler.attackDamage}</span>
+          <span className={`chip ${battler.energy >= battler.attackCost ? 'chip--ready' : ''}`}>Costo {battler.attackCost}</span>
+        </div>
+
+        <div className="energy-row">
+          <span className="eyebrow">Energía</span>
+          <div className="energy-pips">
+            {Array.from({ length: energySlots }).map((_, index) => (
+              <span
+                key={`${battler.id}-energy-${index}`}
+                className={`energy-pip ${index < battler.energy ? 'is-filled' : ''} ${index < battler.attackCost && battler.energy >= battler.attackCost ? 'is-ready' : ''}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
-
-      <dl className="battle-card-stats">
-        <div>
-          <dt>Energía</dt>
-          <dd>{energy}</dd>
-        </div>
-        <div>
-          <dt>Ataque</dt>
-          <dd>{attackName}</dd>
-        </div>
-        <div>
-          <dt>Daño</dt>
-          <dd>{attackDamage}</dd>
-        </div>
-        <div>
-          <dt>Costo</dt>
-          <dd>{attackCost}</dd>
-        </div>
-      </dl>
     </article>
   );
 }
 
 export function App() {
   const {
-    aesthetic,
-    npcRuntime,
     catalogStatus,
     errorMessage,
     match,
@@ -121,6 +175,19 @@ export function App() {
     resetCurrentMatch,
   } = useBattleStore();
 
+  const [attackFx, setAttackFx] = useState<AttackFx | null>(null);
+  const rootRef = useRef<HTMLElement | null>(null);
+  const handRefs = useRef<Array<HTMLElement | null>>([]);
+  const handCardMapRef = useRef<Record<string, HTMLElement | null>>({});
+  const logRefs = useRef<Array<HTMLElement | null>>([]);
+  const beamRef = useRef<HTMLDivElement | null>(null);
+  const damageRef = useRef<HTMLDivElement | null>(null);
+  const resultPanelRef = useRef<HTMLDivElement | null>(null);
+  const playerSlotRef = useRef<HTMLDivElement | null>(null);
+  const playerActiveRef = useRef<HTMLDivElement | null>(null);
+  const npcActiveRef = useRef<HTMLDivElement | null>(null);
+  const previousMatchRef = useRef<GameState | null>(null);
+
   useEffect(() => {
     let active = true;
 
@@ -129,15 +196,9 @@ export function App() {
 
       try {
         const catalog = await loadCards();
-
-        if (active) {
-          initializeCatalog(catalog);
-        }
+        if (active) initializeCatalog(catalog);
       } catch (error) {
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         const message = error instanceof Error ? error.message : 'No se pudo cargar el catálogo.';
         setCatalogError(message);
       }
@@ -166,234 +227,285 @@ export function App() {
   const playerCanPass =
     match?.phase === 'player-turn' && match.turn === 'player' && !match.pendingNpc && !match.winner;
 
+  const logEntries = useMemo(() => (match ? match.log.map(formatLogEntry).slice(-6).reverse() : []), [match]);
+  const summary = useMemo(() => (match ? getMatchSummary(match) : null), [match]);
+  const cardOfTheGame = match?.winner === 'player' ? match.playerActive : match?.npcActive;
+
+  useEffect(() => {
+    if (!match) return;
+
+    const previous = previousMatchRef.current;
+    if (previous) {
+      const npcDamage = previous.npcActive && match.npcActive ? previous.npcActive.currentHp - match.npcActive.currentHp : 0;
+      const playerDamage = previous.playerActive && match.playerActive ? previous.playerActive.currentHp - match.playerActive.currentHp : 0;
+
+      if (npcDamage > 0) setAttackFx({ key: Date.now(), attacker: 'player', damage: npcDamage });
+      else if (playerDamage > 0) setAttackFx({ key: Date.now(), attacker: 'npc', damage: playerDamage });
+    }
+
+    previousMatchRef.current = match;
+  }, [match]);
+
+  useGSAP(
+    () => {
+      gsap.from('.hud-floating, .board-overlay, .battle-log-anchor', {
+        opacity: 0,
+        y: 18,
+        duration: 0.6,
+        ease: 'power2.out',
+        stagger: 0.06,
+      });
+    },
+    { scope: rootRef, dependencies: [catalogStatus] },
+  );
+
+  useGSAP(
+    () => {
+      const items = handRefs.current.filter(Boolean);
+      if (!items.length) return;
+
+      gsap.fromTo(items, { opacity: 0, y: 55, rotate: 4, scale: 0.96 }, { opacity: 1, y: 0, rotate: 0, scale: 1, duration: 0.5, ease: 'power3.out', stagger: 0.07 });
+    },
+    { dependencies: [match?.matchId, match?.playerHand.length] },
+  );
+
+  useGSAP(
+    () => {
+      const items = logRefs.current.filter(Boolean);
+      if (!items.length) return;
+      gsap.fromTo(items, { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.3, stagger: 0.05, ease: 'power2.out' });
+    },
+    { dependencies: [logEntries.join('|')] },
+  );
+
+  useGSAP(
+    () => {
+      if (!attackFx || !beamRef.current || !damageRef.current) return;
+
+      const fromPlayer = attackFx.attacker === 'player';
+      const attackerCard = fromPlayer ? playerActiveRef.current : npcActiveRef.current;
+      const defenderCard = fromPlayer ? npcActiveRef.current : playerActiveRef.current;
+      const tl = gsap.timeline();
+
+      gsap.set(beamRef.current, { opacity: 0, scaleY: 0.15, rotate: fromPlayer ? -10 : 10, transformOrigin: fromPlayer ? 'bottom center' : 'top center' });
+      gsap.set(damageRef.current, { opacity: 0, y: fromPlayer ? -14 : 14, scale: 0.8 });
+
+      if (attackerCard) {
+        tl.fromTo(attackerCard, { y: 0, scale: 1 }, { y: fromPlayer ? -20 : 20, scale: 1.04, duration: 0.16, ease: 'power2.out', yoyo: true, repeat: 1 }, 0);
+      }
+
+      if (defenderCard) {
+        tl.fromTo(defenderCard, { filter: 'brightness(1)', x: 0 }, { filter: 'brightness(1.45)', x: 8, duration: 0.08, ease: 'power1.inOut', yoyo: true, repeat: 3 }, 0.14);
+      }
+
+      tl.to(beamRef.current, { opacity: 1, scaleY: 1, duration: 0.16, ease: 'power2.out' })
+        .to(beamRef.current, { opacity: 0, duration: 0.18, ease: 'power1.in' })
+        .to(damageRef.current, { opacity: 1, y: 0, scale: 1, duration: 0.18, ease: 'back.out(1.8)' }, '-=0.14')
+        .to(damageRef.current, { opacity: 0, y: fromPlayer ? -30 : 30, duration: 0.45, ease: 'power2.out' }, '+=0.12')
+        .call(() => setAttackFx(null));
+    },
+    { dependencies: [attackFx?.key] },
+  );
+
+  useGSAP(
+    () => {
+      if (!match?.winner || !resultPanelRef.current) return;
+      gsap.fromTo(resultPanelRef.current, { opacity: 0, scale: 0.94, y: 24 }, { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: 'power3.out' });
+    },
+    { dependencies: [match?.winner] },
+  );
+
+  const handleSelectPlayerActive = (cardId: string) => {
+    const source = handCardMapRef.current[cardId];
+    const target = playerSlotRef.current;
+
+    if (source && target) {
+      const sourceRect = source.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const clone = source.cloneNode(true) as HTMLElement;
+
+      clone.style.position = 'fixed';
+      clone.style.left = `${sourceRect.left}px`;
+      clone.style.top = `${sourceRect.top}px`;
+      clone.style.width = `${sourceRect.width}px`;
+      clone.style.height = `${sourceRect.height}px`;
+      clone.style.margin = '0';
+      clone.style.zIndex = '120';
+      clone.style.pointerEvents = 'none';
+      clone.style.transform = 'none';
+      document.body.appendChild(clone);
+
+      gsap.to(clone, {
+        left: targetRect.left + (targetRect.width - sourceRect.width) / 2,
+        top: targetRect.top + (targetRect.height - sourceRect.height) / 2,
+        scale: 0.76,
+        rotate: 0,
+        duration: 0.42,
+        ease: 'power3.inOut',
+        onComplete: () => clone.remove(),
+      });
+    }
+
+    selectPlayerActive(cardId);
+  };
+
   return (
-    <main className="app-shell">
-      <section className="hero-panel">
-        <div className="hero-actions">
-          <div>
-            <p className="eyebrow">Work Unit 3</p>
-            <h1>Mesa Phaser + NPC HTTP opcional</h1>
-          </div>
-          <button type="button" className="secondary-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
-            Nueva partida
-          </button>
-        </div>
+    <main className="game-root" ref={rootRef}>
+      <ThreeArena />
 
-        <p className="hero-copy">
-          React sigue gobernando el flujo. Phaser observa el store para pintar la mesa y el NPC puede
-          consultar backend sólo si vos lo habilitás; si falla, la demo vuelve al mock local.
-        </p>
-
-        <dl className="hero-meta" aria-label="decisiones del slice">
-          <div>
-            <dt>Filosofía</dt>
-            <dd>{aesthetic.name}</dd>
-          </div>
-          <div>
-            <dt>Por qué</dt>
-            <dd>{aesthetic.why}</dd>
-          </div>
-          <div>
-            <dt>NPC mode</dt>
-            <dd>{npcRuntime.mode === 'http' ? `HTTP opcional · ${npcRuntime.endpoint}` : 'Mock local seguro por defecto'}</dd>
-          </div>
-        </dl>
-      </section>
-
-      {catalogStatus === 'loading' ? (
-        <section className="state-panel" aria-live="polite">
-          <p className="state-kicker">Cargando catálogo local</p>
-          <h2>Armando la partida offline</h2>
-          <p>Parseando el CSV y preparando un match determinístico para empezar a jugar.</p>
-        </section>
-      ) : null}
-
-      {catalogStatus === 'error' ? (
-        <section className="state-panel error-panel" aria-live="assertive">
-          <p className="state-kicker">Error de bootstrap</p>
-          <h2>No se pudo iniciar la demo</h2>
-          <p>{errorMessage}</p>
-          <button type="button" className="primary-action" onClick={() => void loadCards().then(initializeCatalog).catch((error) => setCatalogError(error instanceof Error ? error.message : 'No se pudo cargar el catálogo.'))}>
-            Reintentar carga
-          </button>
-        </section>
-      ) : null}
+      {catalogStatus === 'loading' ? <section className="system-overlay"><h2>Preparando la arena...</h2></section> : null}
+      {catalogStatus === 'error' ? <section className="system-overlay"><h2>No se pudo levantar la demo</h2><p>{errorMessage}</p></section> : null}
 
       {catalogStatus === 'ready' && match ? (
         <>
-          <section className="summary-strip" aria-label="estado de la partida">
-            <article>
-              <span>Fase</span>
-              <strong>{match.phase}</strong>
-            </article>
-            <article>
-              <span>Turno</span>
-              <strong>{match.turn === 'player' ? 'Jugador' : 'NPC'}</strong>
-            </article>
-            <article>
-              <span>Resultado</span>
-              <strong>{match.winner ? (match.winner === 'player' ? 'Victoria' : 'Derrota') : 'En curso'}</strong>
-            </article>
-          </section>
-
-          <section className="battle-layout">
-            <section className="battle-board" aria-labelledby="battle-board-title">
-              <div className="section-heading compact-heading">
-                <div>
-                  <p className="eyebrow">Mesa activa</p>
-                  <h2 id="battle-board-title">Frente de combate</h2>
-                </div>
-                <p>HP y energía visibles siempre. Nada escondido, nada mágico.</p>
+          <div className="board-overlay">
+            <section className="hud-floating">
+              <div className="brand-chip">
+                <p className="eyebrow">Card Battle Prototype</p>
+                <h1>TCG Battle Arena</h1>
               </div>
 
-              <div className="battle-board-stack">
-                <PhaserBoard match={match} />
-
-                <p className="board-caption">
-                  Phaser refleja turno, HP, energía y feedback simple de daño. El estado REAL sigue en Zustand.
-                </p>
-
-                <div className="arena-grid">
-                {match.npcActive ? (
-                  <BattleCard
-                    title={match.npcActive.name}
-                    hp={match.npcActive.currentHp}
-                    maxHp={match.npcActive.hp}
-                    energy={match.npcActive.energy}
-                    attackName={match.npcActive.attackName}
-                    attackDamage={match.npcActive.attackDamage}
-                    attackCost={match.npcActive.attackCost}
-                    status={match.pendingNpc ? 'NPC pensando…' : 'Activo NPC'}
-                  />
-                ) : null}
-
-                {match.playerActive ? (
-                  <BattleCard
-                    title={match.playerActive.name}
-                    hp={match.playerActive.currentHp}
-                    maxHp={match.playerActive.hp}
-                    energy={match.playerActive.energy}
-                    attackName={match.playerActive.attackName}
-                    attackDamage={match.playerActive.attackDamage}
-                    attackCost={match.playerActive.attackCost}
-                    status={match.phase === 'selecting-active' ? 'Esperando selección' : 'Activo jugador'}
-                  />
-                ) : (
-                  <article className="battle-card placeholder-card">
-                    <p className="eyebrow">Paso obligatorio</p>
-                    <h3>Elegí tu carta activa</h3>
-                    <p>Hasta que no la bajes al frente, no hay energía ni ataque habilitado.</p>
-                  </article>
-                )}
-                </div>
+              <div className="hud-stats">
+                <article><span>Turno</span><strong>{match.turn === 'player' ? 'Jugador' : 'NPC'}</strong></article>
+                <article><span>Fase</span><strong>{getPhaseLabel(match.phase, match)}</strong></article>
+                <article><span>Ritmo</span><strong>{match.pendingNpc ? 'Resolviendo NPC' : 'Tu decisión'}</strong></article>
               </div>
+
+              <button type="button" className="secondary-action compact-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
+                Nueva partida
+              </button>
             </section>
 
-            <aside className="control-column">
-              <section className="control-panel" aria-labelledby="actions-title">
-                <div className="section-heading compact-heading">
-                  <div>
-                    <p className="eyebrow">Acciones</p>
-                    <h2 id="actions-title">Turno del jugador</h2>
-                  </div>
-                  <p>
-                    {match.phase === 'selecting-active'
-                      ? 'Primero elegí tu Pokémon activo.'
-                      : match.pendingNpc
-                        ? 'Esperá la respuesta offline del NPC.'
-                        : 'Una energía por turno. Luego atacá o pasá.'}
-                  </p>
-                </div>
+            <div className="board-plane">
+              <div className="field-tag field-tag--top">NPC / Rival</div>
+              <div className="field-tag field-tag--bottom">Jugador</div>
 
-                <div className="action-stack">
-                  <button type="button" className="primary-action" onClick={() => assignPlayerEnergy()} disabled={!playerCanAssignEnergy}>
-                    Asignar energía
-                  </button>
-                  <button type="button" className="primary-action accent-action" onClick={() => void playerAttack()} disabled={!playerCanAttack}>
-                    Atacar
-                  </button>
-                  <button type="button" className="secondary-action full-width" onClick={() => void passPlayerTurn()} disabled={!playerCanPass}>
-                    Pasar turno
-                  </button>
-                </div>
-              </section>
+              <div className="opponent-deck-slot"><ZonePile label="Deck" /></div>
+              <div className="opponent-discard-slot"><ZonePile label="Discard" /></div>
+              <div className="opponent-bench-row"><BenchSlots owner="npc" /></div>
+              <div className="opponent-active-slot" ref={npcActiveRef}>
+                {match.npcActive ? <ActiveCard battler={match.npcActive} owner="npc" status={match.pendingNpc ? 'NPC preparando respuesta' : 'Carta activa rival'} /> : <div className="empty-slot">Esperando rival</div>}
+              </div>
 
-              <section className="control-panel" aria-labelledby="log-title">
-                <div className="section-heading compact-heading">
-                  <div>
-                    <p className="eyebrow">Battle log</p>
-                    <h2 id="log-title">Bitácora</h2>
-                  </div>
-                </div>
+              <div className="combat-lane">
+                <span className="combat-lane__label">Attack Lane</span>
+                <div className={`attack-beam attack-beam--${attackFx?.attacker ?? 'player'} ${attackFx ? 'is-active' : ''}`} ref={beamRef} />
+                <div className={`damage-badge damage-badge--${attackFx?.attacker === 'player' ? 'top' : 'bottom'} ${attackFx ? 'is-active' : ''}`} ref={damageRef}>-{attackFx?.damage ?? 0}</div>
+              </div>
 
-                <ol className="battle-log">
-                  {match.log.map((entry, index) => (
-                    <li key={`${match.matchId}-${index}`}>{entry}</li>
+              <div className="player-deck-slot"><ZonePile label="Deck" /></div>
+              <div className="player-discard-slot"><ZonePile label="Discard" /></div>
+              <div className="player-bench-row"><BenchSlots owner="player" /></div>
+              <div className="player-active-slot" ref={playerSlotRef}>
+                <div className="active-wrapper" ref={playerActiveRef}>
+                  {match.playerActive ? <ActiveCard battler={match.playerActive} owner="player" status={match.phase === 'selecting-active' ? 'Seleccioná tu activo' : 'Tu carta activa'} /> : <div className="empty-slot empty-slot--player">Sin Pokémon activo</div>}
+                </div>
+              </div>
+
+              <div className="action-bar">
+                <button type="button" className="primary-action" onClick={() => assignPlayerEnergy()} disabled={!playerCanAssignEnergy}>Asignar energía</button>
+                <button type="button" className="primary-action accent-action" onClick={() => void playerAttack()} disabled={!playerCanAttack}>Atacar</button>
+                <button type="button" className="secondary-action" onClick={() => void passPlayerTurn()} disabled={!playerCanPass}>Pasar turno</button>
+              </div>
+
+              {match.playerActive ? <div className="energy-sidecar"><span className="eyebrow">Energía</span><strong>{match.playerActive.energy}/{match.playerActive.attackCost}</strong></div> : null}
+            </div>
+
+            <div className="player-hand-zone">
+              <div className="player-hand-zone__header">
+                <p className="eyebrow">Mano del jugador</p>
+                <span className="chip">{match.playerHand.length} cartas</span>
+              </div>
+
+              <div className="hand-fan">
+                {match.playerHand.map((card, index) => {
+                  const middle = (match.playerHand.length - 1) / 2;
+                  const rotation = (index - middle) * 8;
+
+                  return (
+                    <article
+                      key={card.id}
+                      className={`hand-card ${match.phase === 'selecting-active' ? 'is-selectable' : 'is-locked'}`}
+                      ref={(node) => {
+                        handRefs.current[index] = node;
+                        handCardMapRef.current[card.id] = node;
+                      }}
+                      style={{ ['--rotation' as '--rotation']: `${rotation}deg`, ['--offset' as '--offset']: `${Math.abs(index - middle) * 10}px` }}
+                    >
+                      <div className="hand-card__image">
+                        <img src={card.imageLarge || card.imageSmall} alt={`Carta de ${card.name}`} loading="lazy" />
+                      </div>
+
+                      <div className="hand-card__body">
+                        <div className="hand-card__topline">
+                          <h3>{card.name}</h3>
+                          <span>{card.hp} HP</span>
+                        </div>
+
+                        <div className="chip-row">
+                          <span className="chip chip--accent">{card.type}</span>
+                          <span className="chip">Daño {card.attackDamage}</span>
+                          <span className="chip">Costo {card.attackCost}</span>
+                        </div>
+
+                        <p className="hand-card__attack">{card.attackName}</p>
+
+                        <button type="button" className="secondary-action full-width" onClick={() => handleSelectPlayerActive(card.id)} disabled={match.phase !== 'selecting-active'}>
+                          {match.phase === 'selecting-active' ? 'Poner como activo' : 'Reservada en mano'}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+
+            <section className="battle-log-anchor info-panel">
+              <details className="battle-log-drawer">
+                <summary>Battle Log · últimos eventos</summary>
+                <ol className="battle-log battle-log--drawer">
+                  {logEntries.map((entry, index) => (
+                    <li key={`${match.matchId}-${index}`} ref={(node) => (logRefs.current[index] = node)}>{entry}</li>
                   ))}
                 </ol>
-              </section>
-            </aside>
-          </section>
-
-          <section className="hand-section" aria-labelledby="starter-hand-title">
-            <div className="section-heading compact-heading">
-              <div>
-                <p className="eyebrow">Mano</p>
-                <h2 id="starter-hand-title">Elegí o revisá tus cartas</h2>
-              </div>
-              <p>La selección activa sale de la mano. El resto queda visible como contexto del turno.</p>
-            </div>
-
-            <div className="card-grid">
-              {match.playerHand.map((card) => (
-                <article key={card.id} className="pokemon-card selectable-card">
-                  <img src={card.imageSmall} alt={`Carta de ${card.name}`} loading="lazy" />
-                  <div className="card-body">
-                    <div className="card-topline">
-                      <h3>{card.name}</h3>
-                      <span>{card.hp} HP</span>
-                    </div>
-                    <p className="type-pill">{card.type}</p>
-                    <dl className="card-stats">
-                      <div>
-                        <dt>Ataque</dt>
-                        <dd>{card.attackName}</dd>
-                      </div>
-                      <div>
-                        <dt>Daño</dt>
-                        <dd>{card.attackDamage}</dd>
-                      </div>
-                      <div>
-                        <dt>Costo</dt>
-                        <dd>{card.attackCost}</dd>
-                      </div>
-                    </dl>
-                    <button
-                      type="button"
-                      className="secondary-action full-width"
-                      onClick={() => selectPlayerActive(card.id)}
-                      disabled={match.phase !== 'selecting-active'}
-                    >
-                      {match.phase === 'selecting-active' ? 'Poner como activo' : 'En mano'}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            {match.playerActive ? (
-              <p className="active-caption">Activo actual: {match.playerActive.name}. Energía: {match.playerActive.energy}.</p>
-            ) : null}
-          </section>
+              </details>
+            </section>
+          </div>
 
           {match.winner ? (
-            <section className="state-panel result-panel" aria-live="polite">
-              <p className="state-kicker">Partida resuelta</p>
-              <h2>{match.winner === 'player' ? 'Ganaste la demo local' : 'El NPC ganó esta vuelta'}</h2>
-              <p>El estado se puede reiniciar completo sin arrastrar HP, energía ni log.</p>
-              <button type="button" className="primary-action" onClick={resetCurrentMatch}>
-                Volver a jugar
-              </button>
+            <section className="result-overlay">
+              <div className="result-overlay__backdrop" />
+              <div className="result-panel" ref={resultPanelRef}>
+                <p className="eyebrow">Partida terminada</p>
+                <h2>{match.winner === 'player' ? 'Victoria' : 'Derrota'}</h2>
+                <p>La demo mantuvo el loop completo y cerró la batalla correctamente.</p>
+
+                <div className="result-grid">
+                  <div className="result-card">
+                    <p className="eyebrow">Carta de la partida</p>
+                    {cardOfTheGame ? (
+                      <article className="result-card__feature">
+                        <img src={cardOfTheGame.imageLarge || cardOfTheGame.imageSmall} alt={`Carta destacada de ${cardOfTheGame.name}`} />
+                        <div>
+                          <h3>{cardOfTheGame.name}</h3>
+                          <p>{cardOfTheGame.attackName}</p>
+                        </div>
+                      </article>
+                    ) : <p>Sin carta destacada.</p>}
+                  </div>
+
+                  {summary ? (
+                    <div className="result-stats">
+                      <article><span>Turnos jugados</span><strong>{summary.turnsPlayed}</strong></article>
+                      <article><span>Daño realizado</span><strong>{summary.damageDealt}</strong></article>
+                      <article><span>Daño recibido</span><strong>{summary.damageTaken}</strong></article>
+                      <article><span>Cartas usadas</span><strong>{summary.cardsUsed}</strong></article>
+                    </div>
+                  ) : null}
+                </div>
+
+                <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>
+              </div>
             </section>
           ) : null}
         </>

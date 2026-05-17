@@ -26,9 +26,9 @@ export async function createPhaserBattleBridge(container: HTMLElement): Promise<
   const game: Game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: container,
-    width: 720,
-    height: 460,
-    backgroundColor: '#08111f',
+    width: 1280,
+    height: 760,
+    backgroundColor: '#071326',
     transparent: false,
     scale: {
       mode: Phaser.Scale.FIT,
