@@ -6,6 +6,7 @@ import { canAttack } from '../features/battle/gameEngine';
 import { useBattleStore } from '../features/battle/store';
 import type { Battler, GameState, TurnPhase } from '../features/battle/types';
 import { ThreeArena } from '../game/ThreeArena';
+import { CatalogPage } from '../features/catalog/CatalogPage';
 
 gsap.registerPlugin(useGSAP);
 
@@ -159,7 +160,10 @@ function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'play
   );
 }
 
+type AppView = 'battle' | 'catalog';
+
 export function App() {
+  const [view, setView] = useState<AppView>('battle');
   const {
     catalogStatus,
     errorMessage,
@@ -351,165 +355,197 @@ export function App() {
 
   return (
     <main className="game-root" ref={rootRef}>
-      <ThreeArena />
-
-      {catalogStatus === 'loading' ? <section className="system-overlay"><h2>Preparando la arena...</h2></section> : null}
-      {catalogStatus === 'error' ? <section className="system-overlay"><h2>No se pudo levantar la demo</h2><p>{errorMessage}</p></section> : null}
-
-      {catalogStatus === 'ready' && match ? (
-        <>
-          <div className="board-overlay">
-            <section className="hud-floating">
-              <div className="brand-chip">
-                <p className="eyebrow">Card Battle Prototype</p>
-                <h1>TCG Battle Arena</h1>
-              </div>
-
-              <div className="hud-stats">
-                <article><span>Turno</span><strong>{match.turn === 'player' ? 'Jugador' : 'NPC'}</strong></article>
-                <article><span>Fase</span><strong>{getPhaseLabel(match.phase, match)}</strong></article>
-                <article><span>Ritmo</span><strong>{match.pendingNpc ? 'Resolviendo NPC' : 'Tu decisión'}</strong></article>
-              </div>
-
-              <button type="button" className="secondary-action compact-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
-                Nueva partida
-              </button>
-            </section>
-
-            <div className="board-plane">
-              <div className="field-tag field-tag--top">NPC / Rival</div>
-              <div className="field-tag field-tag--bottom">Jugador</div>
-
-              <div className="opponent-deck-slot"><ZonePile label="Deck" /></div>
-              <div className="opponent-discard-slot"><ZonePile label="Discard" /></div>
-              <div className="opponent-bench-row"><BenchSlots owner="npc" /></div>
-              <div className="opponent-active-slot" ref={npcActiveRef}>
-                {match.npcActive ? <ActiveCard battler={match.npcActive} owner="npc" status={match.pendingNpc ? 'NPC preparando respuesta' : 'Carta activa rival'} /> : <div className="empty-slot">Esperando rival</div>}
-              </div>
-
-              <div className="combat-lane">
-                <span className="combat-lane__label">Attack Lane</span>
-                <div className={`attack-beam attack-beam--${attackFx?.attacker ?? 'player'} ${attackFx ? 'is-active' : ''}`} ref={beamRef} />
-                <div className={`damage-badge damage-badge--${attackFx?.attacker === 'player' ? 'top' : 'bottom'} ${attackFx ? 'is-active' : ''}`} ref={damageRef}>-{attackFx?.damage ?? 0}</div>
-              </div>
-
-              <div className="player-deck-slot"><ZonePile label="Deck" /></div>
-              <div className="player-discard-slot"><ZonePile label="Discard" /></div>
-              <div className="player-bench-row"><BenchSlots owner="player" /></div>
-              <div className="player-active-slot" ref={playerSlotRef}>
-                <div className="active-wrapper" ref={playerActiveRef}>
-                  {match.playerActive ? <ActiveCard battler={match.playerActive} owner="player" status={match.phase === 'selecting-active' ? 'Seleccioná tu activo' : 'Tu carta activa'} /> : <div className="empty-slot empty-slot--player">Sin Pokémon activo</div>}
-                </div>
-              </div>
-
-              <div className="action-bar">
-                <button type="button" className="primary-action" onClick={() => assignPlayerEnergy()} disabled={!playerCanAssignEnergy}>Asignar energía</button>
-                <button type="button" className="primary-action accent-action" onClick={() => void playerAttack()} disabled={!playerCanAttack}>Atacar</button>
-                <button type="button" className="secondary-action" onClick={() => void passPlayerTurn()} disabled={!playerCanPass}>Pasar turno</button>
-              </div>
-
-              {match.playerActive ? <div className="energy-sidecar"><span className="eyebrow">Energía</span><strong>{match.playerActive.energy}/{match.playerActive.attackCost}</strong></div> : null}
-            </div>
-
-            <div className="player-hand-zone">
-              <div className="player-hand-zone__header">
-                <p className="eyebrow">Mano del jugador</p>
-                <span className="chip">{match.playerHand.length} cartas</span>
-              </div>
-
-              <div className="hand-fan">
-                {match.playerHand.map((card, index) => {
-                  const middle = (match.playerHand.length - 1) / 2;
-                  const rotation = (index - middle) * 8;
-
-                  return (
-                    <article
-                      key={card.id}
-                      className={`hand-card ${match.phase === 'selecting-active' ? 'is-selectable' : 'is-locked'}`}
-                      ref={(node) => {
-                        handRefs.current[index] = node;
-                        handCardMapRef.current[card.id] = node;
-                      }}
-                      style={{ ['--rotation' as '--rotation']: `${rotation}deg`, ['--offset' as '--offset']: `${Math.abs(index - middle) * 10}px` }}
-                    >
-                      <div className="hand-card__image">
-                        <img src={card.imageLarge || card.imageSmall} alt={`Carta de ${card.name}`} loading="lazy" />
-                      </div>
-
-                      <div className="hand-card__body">
-                        <div className="hand-card__topline">
-                          <h3>{card.name}</h3>
-                          <span>{card.hp} HP</span>
-                        </div>
-
-                        <div className="chip-row">
-                          <span className="chip chip--accent">{card.type}</span>
-                          <span className="chip">Daño {card.attackDamage}</span>
-                          <span className="chip">Costo {card.attackCost}</span>
-                        </div>
-
-                        <p className="hand-card__attack">{card.attackName}</p>
-
-                        <button type="button" className="secondary-action full-width" onClick={() => handleSelectPlayerActive(card.id)} disabled={match.phase !== 'selecting-active'}>
-                          {match.phase === 'selecting-active' ? 'Poner como activo' : 'Reservada en mano'}
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </div>
-
-            <section className="battle-log-anchor info-panel">
-              <details className="battle-log-drawer">
-                <summary>Battle Log · últimos eventos</summary>
-                <ol className="battle-log battle-log--drawer">
-                  {logEntries.map((entry, index) => (
-                    <li key={`${match.matchId}-${index}`} ref={(node) => (logRefs.current[index] = node)}>{entry}</li>
-                  ))}
-                </ol>
-              </details>
-            </section>
+      {/* Catalog overlay — rendered on top, outside the battle scene */}
+      {view === 'catalog' ? (
+        <div className="catalog-view-root">
+          <div className="catalog-back-bar">
+            <button
+              type="button"
+              id="catalog-back-btn"
+              className="secondary-action catalog-nav-btn"
+              onClick={() => setView('battle')}
+              aria-label="Volver a la batalla"
+            >
+              ← Volver a la batalla
+            </button>
           </div>
+          <CatalogPage />
+        </div>
+      ) : null}
 
-          {match.winner ? (
-            <section className="result-overlay">
-              <div className="result-overlay__backdrop" />
-              <div className="result-panel" ref={resultPanelRef}>
-                <p className="eyebrow">Partida terminada</p>
-                <h2>{match.winner === 'player' ? 'Victoria' : 'Derrota'}</h2>
-                <p>La demo mantuvo el loop completo y cerró la batalla correctamente.</p>
+      {/* Battle arena — always mounted so state is preserved */}
+      <div style={{ display: view === 'battle' ? 'contents' : 'none' }}>
+        <ThreeArena />
 
-                <div className="result-grid">
-                  <div className="result-card">
-                    <p className="eyebrow">Carta de la partida</p>
-                    {cardOfTheGame ? (
-                      <article className="result-card__feature">
-                        <img src={cardOfTheGame.imageLarge || cardOfTheGame.imageSmall} alt={`Carta destacada de ${cardOfTheGame.name}`} />
-                        <div>
-                          <h3>{cardOfTheGame.name}</h3>
-                          <p>{cardOfTheGame.attackName}</p>
+        {catalogStatus === 'loading' ? <section className="system-overlay"><h2>Preparando la arena...</h2></section> : null}
+        {catalogStatus === 'error' ? <section className="system-overlay"><h2>No se pudo levantar la demo</h2><p>{errorMessage}</p></section> : null}
+
+        {catalogStatus === 'ready' && match ? (
+          <>
+            <div className="board-overlay">
+              <section className="hud-floating">
+                <div className="brand-chip">
+                  <p className="eyebrow">Card Battle Prototype</p>
+                  <h1>TCG Battle Arena</h1>
+                </div>
+
+                <div className="hud-stats">
+                  <article><span>Turno</span><strong>{match.turn === 'player' ? 'Jugador' : 'NPC'}</strong></article>
+                  <article><span>Fase</span><strong>{getPhaseLabel(match.phase, match)}</strong></article>
+                  <article><span>Ritmo</span><strong>{match.pendingNpc ? 'Resolviendo NPC' : 'Tu decisión'}</strong></article>
+                </div>
+
+                <div className="hud-actions">
+                  <button type="button" className="secondary-action compact-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
+                    Nueva partida
+                  </button>
+                  <button
+                    type="button"
+                    id="open-catalog-btn"
+                    className="secondary-action compact-action catalog-nav-btn"
+                    onClick={() => setView('catalog')}
+                    aria-label="Abrir catálogo de cartas"
+                  >
+                    📖 Catálogo
+                  </button>
+                </div>
+              </section>
+
+              <div className="board-plane">
+                <div className="field-tag field-tag--top">NPC / Rival</div>
+                <div className="field-tag field-tag--bottom">Jugador</div>
+
+                <div className="opponent-deck-slot"><ZonePile label="Deck" /></div>
+                <div className="opponent-discard-slot"><ZonePile label="Discard" /></div>
+                <div className="opponent-bench-row"><BenchSlots owner="npc" /></div>
+                <div className="opponent-active-slot" ref={npcActiveRef}>
+                  {match.npcActive ? <ActiveCard battler={match.npcActive} owner="npc" status={match.pendingNpc ? 'NPC preparando respuesta' : 'Carta activa rival'} /> : <div className="empty-slot">Esperando rival</div>}
+                </div>
+
+                <div className="combat-lane">
+                  <span className="combat-lane__label">Attack Lane</span>
+                  <div className={`attack-beam attack-beam--${attackFx?.attacker ?? 'player'} ${attackFx ? 'is-active' : ''}`} ref={beamRef} />
+                  <div className={`damage-badge damage-badge--${attackFx?.attacker === 'player' ? 'top' : 'bottom'} ${attackFx ? 'is-active' : ''}`} ref={damageRef}>-{attackFx?.damage ?? 0}</div>
+                </div>
+
+                <div className="player-deck-slot"><ZonePile label="Deck" /></div>
+                <div className="player-discard-slot"><ZonePile label="Discard" /></div>
+                <div className="player-bench-row"><BenchSlots owner="player" /></div>
+                <div className="player-active-slot" ref={playerSlotRef}>
+                  <div className="active-wrapper" ref={playerActiveRef}>
+                    {match.playerActive ? <ActiveCard battler={match.playerActive} owner="player" status={match.phase === 'selecting-active' ? 'Seleccioná tu activo' : 'Tu carta activa'} /> : <div className="empty-slot empty-slot--player">Sin Pokémon activo</div>}
+                  </div>
+                </div>
+
+                <div className="action-bar">
+                  <button type="button" className="primary-action" onClick={() => assignPlayerEnergy()} disabled={!playerCanAssignEnergy}>Asignar energía</button>
+                  <button type="button" className="primary-action accent-action" onClick={() => void playerAttack()} disabled={!playerCanAttack}>Atacar</button>
+                  <button type="button" className="secondary-action" onClick={() => void passPlayerTurn()} disabled={!playerCanPass}>Pasar turno</button>
+                </div>
+
+                {match.playerActive ? <div className="energy-sidecar"><span className="eyebrow">Energía</span><strong>{match.playerActive.energy}/{match.playerActive.attackCost}</strong></div> : null}
+              </div>
+
+              <div className="player-hand-zone">
+                <div className="player-hand-zone__header">
+                  <p className="eyebrow">Mano del jugador</p>
+                  <span className="chip">{match.playerHand.length} cartas</span>
+                </div>
+
+                <div className="hand-fan">
+                  {match.playerHand.map((card, index) => {
+                    const middle = (match.playerHand.length - 1) / 2;
+                    const rotation = (index - middle) * 8;
+
+                    return (
+                      <article
+                        key={card.id}
+                        className={`hand-card ${match.phase === 'selecting-active' ? 'is-selectable' : 'is-locked'}`}
+                        ref={(node) => {
+                          handRefs.current[index] = node;
+                          handCardMapRef.current[card.id] = node;
+                        }}
+                        style={{ '--rotation': `${rotation}deg`, '--offset': `${Math.abs(index - middle) * 10}px` } as React.CSSProperties}
+                      >
+                        <div className="hand-card__image">
+                          <img src={card.imageLarge || card.imageSmall} alt={`Carta de ${card.name}`} loading="lazy" />
+                        </div>
+
+                        <div className="hand-card__body">
+                          <div className="hand-card__topline">
+                            <h3>{card.name}</h3>
+                            <span>{card.hp} HP</span>
+                          </div>
+
+                          <div className="chip-row">
+                            <span className="chip chip--accent">{card.type}</span>
+                            <span className="chip">Daño {card.attackDamage}</span>
+                            <span className="chip">Costo {card.attackCost}</span>
+                          </div>
+
+                          <p className="hand-card__attack">{card.attackName}</p>
+
+                          <button type="button" className="secondary-action full-width" onClick={() => handleSelectPlayerActive(card.id)} disabled={match.phase !== 'selecting-active'}>
+                            {match.phase === 'selecting-active' ? 'Poner como activo' : 'Reservada en mano'}
+                          </button>
                         </div>
                       </article>
-                    ) : <p>Sin carta destacada.</p>}
+                    );
+                  })}
+                </div>
+              </div>
+
+              <section className="battle-log-anchor info-panel">
+                <details className="battle-log-drawer">
+                  <summary>Battle Log · últimos eventos</summary>
+                  <ol className="battle-log battle-log--drawer">
+                    {logEntries.map((entry, index) => (
+                      <li key={`${match.matchId}-${index}`} ref={(node) => { logRefs.current[index] = node; }}>{entry}</li>
+                    ))}
+                  </ol>
+                </details>
+              </section>
+            </div>
+
+            {match.winner ? (
+              <section className="result-overlay">
+                <div className="result-overlay__backdrop" />
+                <div className="result-panel" ref={resultPanelRef}>
+                  <p className="eyebrow">Partida terminada</p>
+                  <h2>{match.winner === 'player' ? 'Victoria' : 'Derrota'}</h2>
+                  <p>La demo mantuvo el loop completo y cerró la batalla correctamente.</p>
+
+                  <div className="result-grid">
+                    <div className="result-card">
+                      <p className="eyebrow">Carta de la partida</p>
+                      {cardOfTheGame ? (
+                        <article className="result-card__feature">
+                          <img src={cardOfTheGame.imageLarge || cardOfTheGame.imageSmall} alt={`Carta destacada de ${cardOfTheGame.name}`} />
+                          <div>
+                            <h3>{cardOfTheGame.name}</h3>
+                            <p>{cardOfTheGame.attackName}</p>
+                          </div>
+                        </article>
+                      ) : <p>Sin carta destacada.</p>}
+                    </div>
+
+                    {summary ? (
+                      <div className="result-stats">
+                        <article><span>Turnos jugados</span><strong>{summary.turnsPlayed}</strong></article>
+                        <article><span>Daño realizado</span><strong>{summary.damageDealt}</strong></article>
+                        <article><span>Daño recibido</span><strong>{summary.damageTaken}</strong></article>
+                        <article><span>Cartas usadas</span><strong>{summary.cardsUsed}</strong></article>
+                      </div>
+                    ) : null}
                   </div>
 
-                  {summary ? (
-                    <div className="result-stats">
-                      <article><span>Turnos jugados</span><strong>{summary.turnsPlayed}</strong></article>
-                      <article><span>Daño realizado</span><strong>{summary.damageDealt}</strong></article>
-                      <article><span>Daño recibido</span><strong>{summary.damageTaken}</strong></article>
-                      <article><span>Cartas usadas</span><strong>{summary.cardsUsed}</strong></article>
-                    </div>
-                  ) : null}
+                  <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>
                 </div>
-
-                <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>
-              </div>
-            </section>
-          ) : null}
-        </>
-      ) : null}
+              </section>
+            ) : null}
+          </>
+        ) : null}
+      </div>{/* end battle display wrapper */}
     </main>
   );
 }

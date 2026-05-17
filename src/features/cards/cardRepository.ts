@@ -2,7 +2,7 @@ import Papa from 'papaparse';
 import type { Card, CsvCardRow } from './types';
 import { normalizeCardRow } from './types';
 
-const CATALOG_URL = '/data/pokemon_cards_gen1.csv';
+const CATALOG_URL = '/data/pokemon_cards_gen1_img.csv';
 const STARTER_CARD_COUNT = 5;
 
 export function parseCatalogCsv(csvText: string): CsvCardRow[] {

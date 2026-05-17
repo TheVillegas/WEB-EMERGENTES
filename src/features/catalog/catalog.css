@@ -1,0 +1,649 @@
+/* ============================================================
+   catalog.css
+   Styles for the Catalog feature.
+   Reuses the design tokens defined in src/app/styles.css:
+     --text, --muted, --cyan, --mint, --warning, --danger,
+     --line, --shadow-soft
+   ============================================================ */
+
+/* ── Page shell ─────────────────────────────────────────────── */
+.catalog-page {
+  min-height: 100vh;
+  padding: 0 0 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+}
+
+.catalog-page--loading,
+.catalog-page--error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 100vh;
+  text-align: center;
+  padding: 40px;
+}
+
+/* ── Loader ─────────────────────────────────────────────────── */
+.catalog-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  color: var(--muted);
+}
+
+.catalog-loader__ring {
+  display: block;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid rgba(76, 215, 255, 0.15);
+  border-top-color: var(--cyan);
+  animation: catalog-spin 0.8s linear infinite;
+}
+
+@keyframes catalog-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error ──────────────────────────────────────────────────── */
+.catalog-error-icon { font-size: 48px; margin: 0; }
+.catalog-error-title { font-size: 20px; font-weight: 700; margin: 0; }
+.catalog-error-sub { color: var(--muted); margin: 0; }
+
+/* ── Page header ─────────────────────────────────────────────── */
+.catalog-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 28px 28px 22px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(9, 18, 34, 0.96) 0%, rgba(7, 14, 28, 0.88) 100%);
+  backdrop-filter: blur(14px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.catalog-header__brand { display: grid; gap: 4px; }
+
+.catalog-header__title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: clamp(22px, 2.6vw, 36px);
+  line-height: 1;
+  background: linear-gradient(135deg, var(--mint), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+.catalog-header__sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ── Three-column layout ─────────────────────────────────────── */
+.catalog-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  gap: 0;
+  min-height: calc(100vh - 100px);
+}
+
+/* ── Shared panel styles ─────────────────────────────────────── */
+.catalog-deck-panel,
+.catalog-center-panel,
+.catalog-details-panel {
+  padding: 20px 18px;
+  overflow-y: auto;
+}
+
+.catalog-deck-panel,
+.catalog-details-panel {
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(9, 18, 34, 0.72) 0%, rgba(7, 14, 28, 0.62) 100%);
+}
+
+.catalog-details-panel {
+  border-right: none;
+  border-left: 1px solid var(--line);
+}
+
+/* ── Panel headers ───────────────────────────────────────────── */
+.catalog-panel-header {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.catalog-panel-title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 18px;
+  line-height: 1.1;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+/* ── Search bar ──────────────────────────────────────────────── */
+.catalog-searchbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+  overflow: hidden;
+}
+
+.catalog-searchbar:focus-within {
+  border-color: rgba(76, 215, 255, 0.44);
+  box-shadow: 0 0 0 3px rgba(76, 215, 255, 0.1);
+}
+
+.catalog-searchbar__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  color: var(--muted);
+}
+
+.catalog-searchbar__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 12px 10px 12px 8px;
+  font-size: 14px;
+  outline: none;
+  appearance: none;
+}
+
+.catalog-searchbar__input::placeholder { color: var(--muted); }
+.catalog-searchbar__input::-webkit-search-cancel-button { display: none; }
+
+.catalog-searchbar__clear {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 999px;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.catalog-searchbar__clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+/* ── Center panel ────────────────────────────────────────────── */
+.catalog-center-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 20px;
+}
+
+.catalog-center-panel__search { flex-shrink: 0; }
+
+.catalog-center-panel__grid {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ── Card grid ───────────────────────────────────────────────── */
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+/* ── Card item ───────────────────────────────────────────────── */
+.catalog-card-item {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(12, 23, 43, 0.92) 0%, rgba(8, 14, 27, 0.88) 100%);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  outline: none;
+}
+
+.catalog-card-item:hover {
+  transform: translateY(-4px);
+  border-color: rgba(76, 215, 255, 0.36);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+
+.catalog-card-item:focus-visible {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(76, 215, 255, 0.22);
+}
+
+.catalog-card-item--selected {
+  border-color: var(--mint);
+  box-shadow: 0 0 0 2px rgba(124, 240, 200, 0.28), 0 12px 32px rgba(0, 0, 0, 0.36);
+}
+
+.catalog-card-item__image-wrap {
+  position: relative;
+  aspect-ratio: 0.72;
+  overflow: hidden;
+}
+
+.catalog-card-item__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 260ms ease;
+}
+
+.catalog-card-item:hover .catalog-card-item__image {
+  transform: scale(1.06);
+}
+
+.catalog-card-item__selected-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--mint);
+  color: #02111a;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.catalog-card-item__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px 10px;
+}
+
+.catalog-card-item__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.catalog-card-item__type {
+  font-size: 10px;
+  padding: 2px 8px;
+  min-height: 22px;
+}
+
+.catalog-card-item__hp {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── Empty states ────────────────────────────────────────────── */
+.catalog-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+  text-align: center;
+  padding: 32px 20px;
+  border-radius: 16px;
+  border: 1px dashed var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.catalog-empty-state--compact { min-height: 160px; }
+
+.catalog-empty-state__icon { font-size: 36px; }
+
+.catalog-empty-state__title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 16px;
+  color: var(--text);
+  margin: 0;
+}
+
+.catalog-empty-state__sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  max-width: 220px;
+}
+
+/* ── Deck panel list ─────────────────────────────────────────── */
+.catalog-deck-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.catalog-deck-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  position: relative;
+}
+
+.catalog-deck-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(76, 215, 255, 0.26);
+  transform: translateX(2px);
+}
+
+.catalog-deck-card--selected {
+  border-color: var(--mint);
+  background: rgba(124, 240, 200, 0.06);
+}
+
+.catalog-deck-card__thumb {
+  width: 40px;
+  height: 55px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.catalog-deck-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.catalog-deck-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catalog-deck-card__meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.catalog-deck-card__indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mint);
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(124, 240, 200, 0.6);
+}
+
+/* ── Details panel ───────────────────────────────────────────── */
+.catalog-details-panel--empty {
+  display: flex;
+  flex-direction: column;
+}
+
+.catalog-detail-card-image {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.catalog-detail-card-img {
+  width: 100%;
+  max-width: 200px;
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  transition: transform 260ms ease;
+}
+
+.catalog-detail-card-img:hover {
+  transform: scale(1.03);
+}
+
+/* ── Pokémon sprite ──────────────────────────────────────────── */
+.catalog-sprite-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: radial-gradient(ellipse at center, rgba(var(--card-accent, 76, 215, 255), 0.06) 0%, transparent 72%);
+  min-height: 100px;
+  justify-content: center;
+}
+
+.catalog-sprite {
+  width: auto;
+  height: 96px;
+  image-rendering: pixelated;
+  animation: catalog-sprite-float 3s ease-in-out infinite;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+}
+
+@keyframes catalog-sprite-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
+.catalog-sprite-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px dashed var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: var(--muted);
+}
+
+.catalog-sprite-label {
+  margin: 0;
+}
+
+/* ── Detail headline ─────────────────────────────────────────── */
+.catalog-detail-headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.catalog-detail-name {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 20px;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.catalog-detail-type-chip {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ── Detail stats grid ───────────────────────────────────────── */
+.catalog-detail-grid {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.catalog-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+}
+
+.catalog-detail-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.catalog-detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.catalog-detail-value--danger { color: var(--danger); }
+.catalog-detail-value--mint   { color: var(--mint); }
+
+/* ── Detail sections ─────────────────────────────────────────── */
+.catalog-detail-section {
+  margin-bottom: 16px;
+}
+
+.catalog-detail-section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+/* ── Attack cards ────────────────────────────────────────────── */
+.catalog-attack-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 8px;
+}
+
+.catalog-attack-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.catalog-attack-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.catalog-attack-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.catalog-attack-damage {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.catalog-attack-effect {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Energy pips row in details ──────────────────────────────── */
+.catalog-energy-pips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Nav button (added to HUD in App.tsx) ────────────────────── */
+.catalog-nav-btn {
+  pointer-events: auto;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .catalog-layout {
+    grid-template-columns: 220px 1fr 260px;
+  }
+}
+
+@media (max-width: 900px) {
+  .catalog-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+
+  /* Mobile order: search → grid → deck → details */
+  .catalog-center-panel { order: 1; border-bottom: 1px solid var(--line); }
+  .catalog-deck-panel   { order: 2; border-right: none; border-bottom: 1px solid var(--line); }
+  .catalog-details-panel { order: 3; border-left: none; border-top: 1px solid var(--line); }
+
+  .catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+
+  .catalog-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 18px 16px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    gap: 10px;
+  }
+
+  .catalog-header__title { font-size: 20px; }
+  .catalog-layout { min-height: auto; }
+}
