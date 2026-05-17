@@ -66,6 +66,8 @@ img {
 .hero-panel,
 .state-panel,
 .summary-strip,
+.battle-board,
+.control-panel,
 .hand-section,
 .catalog-section {
   border: 1px solid var(--border);
@@ -76,10 +78,25 @@ img {
 
 .hero-panel,
 .state-panel,
+.battle-board,
+.control-panel,
 .hand-section,
 .catalog-section {
   border-radius: 1.5rem;
   padding: 1.25rem;
+}
+
+.hero-actions,
+.battle-layout,
+.control-column,
+.arena-grid,
+.action-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.hero-actions {
+  align-items: start;
 }
 
 .summary-strip {
@@ -174,6 +191,10 @@ h2 {
   border-color: rgba(255, 141, 141, 0.35);
 }
 
+.result-panel {
+  border-color: rgba(137, 240, 181, 0.35);
+}
+
 .primary-action {
   margin-top: 1rem;
   min-height: 44px;
@@ -186,15 +207,148 @@ h2 {
   cursor: pointer;
 }
 
+.secondary-action {
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.accent-action {
+  background: linear-gradient(135deg, #7dd3fc 0%, #60d394 100%);
+}
+
+.full-width {
+  width: 100%;
+}
+
 .primary-action:focus-visible {
   outline: 3px solid white;
   outline-offset: 3px;
+}
+
+.secondary-action:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
+
+.primary-action:disabled,
+.secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .section-heading {
   display: grid;
   gap: 0.5rem;
   margin-bottom: 1rem;
+}
+
+.compact-heading p:last-child {
+  max-width: 34rem;
+}
+
+.battle-layout {
+  grid-template-columns: 1fr;
+}
+
+.battle-board,
+.control-panel {
+  background: var(--bg-elevated);
+}
+
+.arena-grid {
+  grid-template-columns: 1fr;
+}
+
+.battle-card {
+  border-radius: 1.15rem;
+  border: 1px solid rgba(145, 222, 255, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(96, 211, 148, 0.18), transparent 35%),
+    var(--bg-soft);
+  padding: 1rem;
+}
+
+.placeholder-card {
+  display: grid;
+  gap: 0.5rem;
+  align-content: center;
+  min-height: 16rem;
+}
+
+.battle-card-topline {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.counter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.8rem;
+  background: rgba(137, 240, 181, 0.1);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.meter-block {
+  margin-top: 1rem;
+}
+
+.meter-track {
+  height: 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #89f0b5 0%, #7dd3fc 100%);
+}
+
+.battle-card-stats {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.battle-card-stats div {
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.battle-card-stats dd {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 1.05rem;
+}
+
+.battle-log {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.battle-log li {
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.active-caption {
+  margin-top: 1rem;
+  color: var(--muted);
 }
 
 .card-grid {
@@ -205,6 +359,10 @@ h2 {
 
 .pokemon-card {
   overflow: hidden;
+}
+
+.selectable-card {
+  display: grid;
 }
 
 .pokemon-card img {
@@ -260,6 +418,14 @@ h2 {
     gap: 1.25rem;
   }
 
+  .hero-actions {
+    grid-template-columns: 1fr auto;
+  }
+
+  .arena-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .summary-strip {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -272,6 +438,11 @@ h2 {
 @media (min-width: 1024px) {
   .app-shell {
     padding-top: 2rem;
+  }
+
+  .battle-layout {
+    grid-template-columns: minmax(0, 1.45fr) minmax(20rem, 0.9fr);
+    align-items: start;
   }
 
   .card-grid {

@@ -1,49 +1,145 @@
-import { useEffect, useMemo, useState } from 'react';
-import { loadCards, selectStarterCards } from '../features/cards/cardRepository';
-import type { Card } from '../features/cards/types';
+import { useEffect } from 'react';
+import { loadCards } from '../features/cards/cardRepository';
+import { canAttack } from '../features/battle/gameEngine';
+import { useBattleStore } from '../features/battle/store';
 
-type ViewState =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'ready'; catalog: Card[] };
+function BattleCard({
+  title,
+  hp,
+  maxHp,
+  energy,
+  attackName,
+  attackDamage,
+  attackCost,
+  status,
+}: {
+  title: string;
+  hp: number;
+  maxHp: number;
+  energy: number;
+  attackName: string;
+  attackDamage: number;
+  attackCost: number;
+  status: string;
+}) {
+  const hpRatio = maxHp > 0 ? Math.max(0, Math.round((hp / maxHp) * 100)) : 0;
 
-const aesthetic = {
-  name: 'Portable console',
-  why: 'prioriza legibilidad grabable, contraste alto y una base sobria para sumar Phaser y Zustand sin rehacer la UI.',
-};
+  return (
+    <article className="battle-card" aria-label={`${title} en juego`}>
+      <div className="battle-card-topline">
+        <div>
+          <p className="eyebrow">{status}</p>
+          <h3>{title}</h3>
+        </div>
+        <span className="counter-pill">{hp}/{maxHp} HP</span>
+      </div>
+
+      <div className="meter-block" aria-label={`Vida restante de ${title}`}>
+        <div className="meter-track">
+          <div className="meter-fill" style={{ width: `${hpRatio}%` }} />
+        </div>
+      </div>
+
+      <dl className="battle-card-stats">
+        <div>
+          <dt>Energía</dt>
+          <dd>{energy}</dd>
+        </div>
+        <div>
+          <dt>Ataque</dt>
+          <dd>{attackName}</dd>
+        </div>
+        <div>
+          <dt>Daño</dt>
+          <dd>{attackDamage}</dd>
+        </div>
+        <div>
+          <dt>Costo</dt>
+          <dd>{attackCost}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
 
 export function App() {
-  const [viewState, setViewState] = useState<ViewState>({ status: 'loading' });
-
-  const fetchCatalog = async () => {
-    setViewState({ status: 'loading' });
-
-    try {
-      const catalog = await loadCards();
-      setViewState({ status: 'ready', catalog });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo cargar el catálogo.';
-      setViewState({ status: 'error', message });
-    }
-  };
+  const {
+    aesthetic,
+    catalogStatus,
+    errorMessage,
+    match,
+    setCatalogLoading,
+    setCatalogError,
+    initializeCatalog,
+    startMatch,
+    selectPlayerActive,
+    assignPlayerEnergy,
+    playerAttack,
+    passPlayerTurn,
+    resetCurrentMatch,
+  } = useBattleStore();
 
   useEffect(() => {
-    void fetchCatalog();
-  }, []);
+    let active = true;
 
-  const starterCards = useMemo(
-    () => (viewState.status === 'ready' ? selectStarterCards(viewState.catalog) : []),
-    [viewState],
-  );
+    const bootstrap = async () => {
+      setCatalogLoading();
+
+      try {
+        const catalog = await loadCards();
+
+        if (active) {
+          initializeCatalog(catalog);
+        }
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : 'No se pudo cargar el catálogo.';
+        setCatalogError(message);
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      active = false;
+    };
+  }, [initializeCatalog, setCatalogError, setCatalogLoading]);
+
+  const playerCanAssignEnergy =
+    match?.phase === 'player-turn' &&
+    match.turn === 'player' &&
+    Boolean(match.playerActive) &&
+    !match.energyAssignedThisTurn &&
+    !match.pendingNpc;
+
+  const playerCanAttack =
+    match?.phase === 'player-turn' &&
+    match.turn === 'player' &&
+    canAttack(match.playerActive) &&
+    !match.pendingNpc;
+
+  const playerCanPass =
+    match?.phase === 'player-turn' && match.turn === 'player' && !match.pendingNpc && !match.winner;
 
   return (
     <main className="app-shell">
       <section className="hero-panel">
-        <p className="eyebrow">Slice 1 listo</p>
-        <h1>Pokémon Web Demo</h1>
+        <div className="hero-actions">
+          <div>
+            <p className="eyebrow">Work Unit 2</p>
+            <h1>Loop local jugable</h1>
+          </div>
+          <button type="button" className="secondary-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
+            Nueva partida
+          </button>
+        </div>
+
         <p className="hero-copy">
-          Shell visible, catálogo local y mano inicial real cargada desde CSV. Nada de humo: esto ya
-          deja la base concreta para el loop de batalla.
+          Elegís una carta activa, cargás energía, atacás, el NPC responde offline y el resultado se
+          resuelve sin backend.
         </p>
 
         <dl className="hero-meta" aria-label="decisiones del slice">
@@ -58,54 +154,145 @@ export function App() {
         </dl>
       </section>
 
-      {viewState.status === 'loading' ? (
+      {catalogStatus === 'loading' ? (
         <section className="state-panel" aria-live="polite">
           <p className="state-kicker">Cargando catálogo local</p>
-          <h2>Preparando la mano base</h2>
-          <p>Parseando `/public/data/pokemon_cards_gen1.csv` y filtrando sólo cartas Pokémon.</p>
+          <h2>Armando la partida offline</h2>
+          <p>Parseando el CSV y preparando un match determinístico para empezar a jugar.</p>
         </section>
       ) : null}
 
-      {viewState.status === 'error' ? (
+      {catalogStatus === 'error' ? (
         <section className="state-panel error-panel" aria-live="assertive">
           <p className="state-kicker">Error de bootstrap</p>
-          <h2>La demo no pudo abrir el catálogo</h2>
-          <p>{viewState.message}</p>
-          <button type="button" className="primary-action" onClick={() => void fetchCatalog()}>
+          <h2>No se pudo iniciar la demo</h2>
+          <p>{errorMessage}</p>
+          <button type="button" className="primary-action" onClick={() => void loadCards().then(initializeCatalog).catch((error) => setCatalogError(error instanceof Error ? error.message : 'No se pudo cargar el catálogo.'))}>
             Reintentar carga
           </button>
         </section>
       ) : null}
 
-      {viewState.status === 'ready' ? (
+      {catalogStatus === 'ready' && match ? (
         <>
-          <section className="summary-strip" aria-label="resumen del catálogo">
+          <section className="summary-strip" aria-label="estado de la partida">
             <article>
-              <span>Total Pokémon</span>
-              <strong>{viewState.catalog.length}</strong>
+              <span>Fase</span>
+              <strong>{match.phase}</strong>
             </article>
             <article>
-              <span>Mano inicial</span>
-              <strong>{starterCards.length} cartas</strong>
+              <span>Turno</span>
+              <strong>{match.turn === 'player' ? 'Jugador' : 'NPC'}</strong>
             </article>
             <article>
-              <span>Siguiente slice</span>
-              <strong>Store + loop local</strong>
+              <span>Resultado</span>
+              <strong>{match.winner ? (match.winner === 'player' ? 'Victoria' : 'Derrota') : 'En curso'}</strong>
             </article>
           </section>
 
-          <section className="hand-section" aria-labelledby="starter-hand-title">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Starter cards</p>
-                <h2 id="starter-hand-title">Mano base visible</h2>
+          <section className="battle-layout">
+            <section className="battle-board" aria-labelledby="battle-board-title">
+              <div className="section-heading compact-heading">
+                <div>
+                  <p className="eyebrow">Mesa activa</p>
+                  <h2 id="battle-board-title">Frente de combate</h2>
+                </div>
+                <p>HP y energía visibles siempre. Nada escondido, nada mágico.</p>
               </div>
-              <p>Selección determinística para validar carga, filtro y render real antes del loop.</p>
+
+              <div className="arena-grid">
+                {match.npcActive ? (
+                  <BattleCard
+                    title={match.npcActive.name}
+                    hp={match.npcActive.currentHp}
+                    maxHp={match.npcActive.hp}
+                    energy={match.npcActive.energy}
+                    attackName={match.npcActive.attackName}
+                    attackDamage={match.npcActive.attackDamage}
+                    attackCost={match.npcActive.attackCost}
+                    status={match.pendingNpc ? 'NPC pensando…' : 'Activo NPC'}
+                  />
+                ) : null}
+
+                {match.playerActive ? (
+                  <BattleCard
+                    title={match.playerActive.name}
+                    hp={match.playerActive.currentHp}
+                    maxHp={match.playerActive.hp}
+                    energy={match.playerActive.energy}
+                    attackName={match.playerActive.attackName}
+                    attackDamage={match.playerActive.attackDamage}
+                    attackCost={match.playerActive.attackCost}
+                    status={match.phase === 'selecting-active' ? 'Esperando selección' : 'Activo jugador'}
+                  />
+                ) : (
+                  <article className="battle-card placeholder-card">
+                    <p className="eyebrow">Paso obligatorio</p>
+                    <h3>Elegí tu carta activa</h3>
+                    <p>Hasta que no la bajes al frente, no hay energía ni ataque habilitado.</p>
+                  </article>
+                )}
+              </div>
+            </section>
+
+            <aside className="control-column">
+              <section className="control-panel" aria-labelledby="actions-title">
+                <div className="section-heading compact-heading">
+                  <div>
+                    <p className="eyebrow">Acciones</p>
+                    <h2 id="actions-title">Turno del jugador</h2>
+                  </div>
+                  <p>
+                    {match.phase === 'selecting-active'
+                      ? 'Primero elegí tu Pokémon activo.'
+                      : match.pendingNpc
+                        ? 'Esperá la respuesta offline del NPC.'
+                        : 'Una energía por turno. Luego atacá o pasá.'}
+                  </p>
+                </div>
+
+                <div className="action-stack">
+                  <button type="button" className="primary-action" onClick={() => assignPlayerEnergy()} disabled={!playerCanAssignEnergy}>
+                    Asignar energía
+                  </button>
+                  <button type="button" className="primary-action accent-action" onClick={() => void playerAttack()} disabled={!playerCanAttack}>
+                    Atacar
+                  </button>
+                  <button type="button" className="secondary-action full-width" onClick={() => void passPlayerTurn()} disabled={!playerCanPass}>
+                    Pasar turno
+                  </button>
+                </div>
+              </section>
+
+              <section className="control-panel" aria-labelledby="log-title">
+                <div className="section-heading compact-heading">
+                  <div>
+                    <p className="eyebrow">Battle log</p>
+                    <h2 id="log-title">Bitácora</h2>
+                  </div>
+                </div>
+
+                <ol className="battle-log">
+                  {match.log.map((entry, index) => (
+                    <li key={`${match.matchId}-${index}`}>{entry}</li>
+                  ))}
+                </ol>
+              </section>
+            </aside>
+          </section>
+
+          <section className="hand-section" aria-labelledby="starter-hand-title">
+            <div className="section-heading compact-heading">
+              <div>
+                <p className="eyebrow">Mano</p>
+                <h2 id="starter-hand-title">Elegí o revisá tus cartas</h2>
+              </div>
+              <p>La selección activa sale de la mano. El resto queda visible como contexto del turno.</p>
             </div>
 
             <div className="card-grid">
-              {starterCards.map((card) => (
-                <article key={card.id} className="pokemon-card">
+              {match.playerHand.map((card) => (
+                <article key={card.id} className="pokemon-card selectable-card">
                   <img src={card.imageSmall} alt={`Carta de ${card.name}`} loading="lazy" />
                   <div className="card-body">
                     <div className="card-topline">
@@ -127,32 +314,34 @@ export function App() {
                         <dd>{card.attackCost}</dd>
                       </div>
                     </dl>
+                    <button
+                      type="button"
+                      className="secondary-action full-width"
+                      onClick={() => selectPlayerActive(card.id)}
+                      disabled={match.phase !== 'selecting-active'}
+                    >
+                      {match.phase === 'selecting-active' ? 'Poner como activo' : 'En mano'}
+                    </button>
                   </div>
                 </article>
               ))}
             </div>
+
+            {match.playerActive ? (
+              <p className="active-caption">Activo actual: {match.playerActive.name}. Energía: {match.playerActive.energy}.</p>
+            ) : null}
           </section>
 
-          <section className="catalog-section" aria-labelledby="catalog-title">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Catalog preview</p>
-                <h2 id="catalog-title">Pool listo para slices siguientes</h2>
-              </div>
-              <p>La UI ya expone datos normalizados que después pueden entrar al store sin reparsear.</p>
-            </div>
-
-            <ul className="catalog-list">
-              {viewState.catalog.slice(0, 8).map((card) => (
-                <li key={`${card.id}-row`}>
-                  <span>{card.name}</span>
-                  <small>
-                    {card.type} · {card.attackName} · {card.attackDamage} DMG
-                  </small>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {match.winner ? (
+            <section className="state-panel result-panel" aria-live="polite">
+              <p className="state-kicker">Partida resuelta</p>
+              <h2>{match.winner === 'player' ? 'Ganaste la demo local' : 'El NPC ganó esta vuelta'}</h2>
+              <p>El estado se puede reiniciar completo sin arrastrar HP, energía ni log.</p>
+              <button type="button" className="primary-action" onClick={resetCurrentMatch}>
+                Volver a jugar
+              </button>
+            </section>
+          ) : null}
         </>
       ) : null}
     </main>
