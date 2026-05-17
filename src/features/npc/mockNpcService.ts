@@ -15,13 +15,13 @@ export class MockNpcService implements NpcService {
     await wait(this.delayMs);
 
     if (canAttack(state.npcActive)) {
-      return { type: 'attack', reason: 'tiene energía suficiente' };
+      return { type: 'attack', reason: 'tiene energía suficiente', source: 'mock' };
     }
 
     if (!state.energyAssignedThisTurn && state.npcActive) {
-      return { type: 'attach-energy', reason: 'prepara el próximo ataque' };
+      return { type: 'attach-energy', reason: 'prepara el próximo ataque', source: 'mock' };
     }
 
-    return { type: 'pass', reason: 'todavía no llega al costo del ataque' };
+    return { type: 'pass', reason: 'todavía no llega al costo del ataque', source: 'mock' };
   }
 }

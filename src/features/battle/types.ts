@@ -31,4 +31,6 @@ export type NpcActionType = 'attach-energy' | 'attack' | 'pass';
 export type NpcAction = {
   type: NpcActionType;
   reason?: string;
+  source?: 'mock' | 'http';
+  notice?: string;
 };

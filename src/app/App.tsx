@@ -1,7 +1,48 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { loadCards } from '../features/cards/cardRepository';
 import { canAttack } from '../features/battle/gameEngine';
 import { useBattleStore } from '../features/battle/store';
+import type { GameState } from '../features/battle/types';
+import { createPhaserBattleBridge, type PhaserBattleBridge } from '../game/phaserBridge';
+
+function PhaserBoard({ match }: { match: GameState }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const bridgeRef = useRef<PhaserBattleBridge | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      if (!hostRef.current) {
+        return;
+      }
+
+      const bridge = await createPhaserBattleBridge(hostRef.current);
+
+      if (cancelled) {
+        bridge.destroy();
+        return;
+      }
+
+      bridgeRef.current = bridge;
+      bridge.sync(match);
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+      bridgeRef.current?.destroy();
+      bridgeRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    bridgeRef.current?.sync(match);
+  }, [match]);
+
+  return <div ref={hostRef} className="phaser-stage" aria-label="Tablero Phaser en modo solo lectura" />;
+}
 
 function BattleCard({
   title,
@@ -65,6 +106,7 @@ function BattleCard({
 export function App() {
   const {
     aesthetic,
+    npcRuntime,
     catalogStatus,
     errorMessage,
     match,
@@ -129,8 +171,8 @@ export function App() {
       <section className="hero-panel">
         <div className="hero-actions">
           <div>
-            <p className="eyebrow">Work Unit 2</p>
-            <h1>Loop local jugable</h1>
+            <p className="eyebrow">Work Unit 3</p>
+            <h1>Mesa Phaser + NPC HTTP opcional</h1>
           </div>
           <button type="button" className="secondary-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
             Nueva partida
@@ -138,8 +180,8 @@ export function App() {
         </div>
 
         <p className="hero-copy">
-          Elegís una carta activa, cargás energía, atacás, el NPC responde offline y el resultado se
-          resuelve sin backend.
+          React sigue gobernando el flujo. Phaser observa el store para pintar la mesa y el NPC puede
+          consultar backend sólo si vos lo habilitás; si falla, la demo vuelve al mock local.
         </p>
 
         <dl className="hero-meta" aria-label="decisiones del slice">
@@ -150,6 +192,10 @@ export function App() {
           <div>
             <dt>Por qué</dt>
             <dd>{aesthetic.why}</dd>
+          </div>
+          <div>
+            <dt>NPC mode</dt>
+            <dd>{npcRuntime.mode === 'http' ? `HTTP opcional · ${npcRuntime.endpoint}` : 'Mock local seguro por defecto'}</dd>
           </div>
         </dl>
       </section>
@@ -200,7 +246,14 @@ export function App() {
                 <p>HP y energía visibles siempre. Nada escondido, nada mágico.</p>
               </div>
 
-              <div className="arena-grid">
+              <div className="battle-board-stack">
+                <PhaserBoard match={match} />
+
+                <p className="board-caption">
+                  Phaser refleja turno, HP, energía y feedback simple de daño. El estado REAL sigue en Zustand.
+                </p>
+
+                <div className="arena-grid">
                 {match.npcActive ? (
                   <BattleCard
                     title={match.npcActive.name}
@@ -232,6 +285,7 @@ export function App() {
                     <p>Hasta que no la bajes al frente, no hay energía ni ataque habilitado.</p>
                   </article>
                 )}
+                </div>
               </div>
             </section>
 

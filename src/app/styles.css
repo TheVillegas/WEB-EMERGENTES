@@ -89,6 +89,7 @@ img {
 .hero-actions,
 .battle-layout,
 .control-column,
+.battle-board-stack,
 .arena-grid,
 .action-stack {
   display: grid;
@@ -258,6 +259,26 @@ h2 {
 .battle-board,
 .control-panel {
   background: var(--bg-elevated);
+}
+
+.phaser-stage {
+  width: 100%;
+  min-height: 18rem;
+  border-radius: 1.15rem;
+  overflow: hidden;
+  border: 1px solid rgba(145, 222, 255, 0.14);
+  background: linear-gradient(180deg, rgba(19, 37, 65, 0.94) 0%, rgba(8, 17, 31, 0.98) 100%);
+}
+
+.phaser-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.board-caption {
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .arena-grid {

@@ -122,4 +122,25 @@ describe('battleStore', () => {
     expect(match?.playerActive?.currentHp).toBe(40);
     expect(match?.log.at(-1)).toContain('NPC usó Gnaw');
   });
+
+  it('anota un aviso no bloqueante cuando el adapter HTTP cae y usa fallback local', async () => {
+    const npcService: NpcService = {
+      decideAction: vi.fn(async () => ({
+        type: 'pass',
+        reason: 'mock de contingencia',
+        source: 'mock',
+        notice: 'Backend NPC no disponible. Se usa mock local en este turno.',
+      })),
+    };
+    const store = createBattleStore(npcService);
+
+    store.getState().initializeCatalog(catalog);
+    store.getState().selectPlayerActive('charmander-1');
+
+    await store.getState().passPlayerTurn();
+
+    const match = store.getState().match;
+    expect(match?.log).toContain('Backend NPC no disponible. Se usa mock local en este turno.');
+    expect(match?.log.at(-1)).toContain('NPC pasó el turno');
+  });
 });

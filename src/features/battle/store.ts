@@ -2,8 +2,7 @@ import { create } from 'zustand';
 import { assignEnergy, canAttack, createMatch, passTurn, playCard, resetMatch, resolveAttack } from './gameEngine';
 import type { GameState } from './types';
 import type { Card } from '../cards/types';
-import type { NpcService } from '../npc/npcService';
-import { MockNpcService } from '../npc/mockNpcService';
+import { createNpcService, getNpcRuntimeConfig, type NpcService } from '../npc/npcService';
 
 type CatalogStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -11,6 +10,10 @@ export type BattleStoreState = {
   aesthetic: {
     name: string;
     why: string;
+  };
+  npcRuntime: {
+    mode: 'mock' | 'http';
+    endpoint: string;
   };
   catalogStatus: CatalogStatus;
   errorMessage: string | null;
@@ -47,6 +50,13 @@ async function resolveNpcTurn(
 
   let next = latest;
 
+  if (action.notice) {
+    next = {
+      ...next,
+      log: [...next.log, action.notice],
+    };
+  }
+
   if (action.type === 'attach-energy') {
     next = assignEnergy(next, 'npc');
 
@@ -64,9 +74,15 @@ async function resolveNpcTurn(
   setState(() => ({ match: next }));
 }
 
-export function createBattleStore(npcService: NpcService = new MockNpcService()) {
+const npcRuntime = getNpcRuntimeConfig();
+
+export function createBattleStore(npcService: NpcService = createNpcService()) {
   return create<BattleStoreState>((set, get) => ({
     aesthetic,
+    npcRuntime: {
+      mode: npcRuntime.mode,
+      endpoint: npcRuntime.endpoint,
+    },
     catalogStatus: 'idle',
     errorMessage: null,
     catalog: [],
