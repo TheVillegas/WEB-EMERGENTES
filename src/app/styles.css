@@ -1,0 +1,290 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root {
+  color-scheme: dark;
+  font-family: 'IBM Plex Sans', sans-serif;
+  --bg: #08111f;
+  --bg-elevated: rgba(11, 24, 44, 0.88);
+  --bg-soft: rgba(19, 37, 65, 0.9);
+  --border: rgba(145, 222, 255, 0.2);
+  --text: #e8f2ff;
+  --muted: #9fb4d1;
+  --accent: #89f0b5;
+  --accent-strong: #60d394;
+  --danger: #ff8d8d;
+  --shadow: 0 24px 50px rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top, rgba(67, 118, 198, 0.28), transparent 34%),
+    linear-gradient(180deg, #08111f 0%, #04070d 100%);
+  color: var(--text);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(rgba(255, 255, 255, 0.04) 0, transparent 2px);
+  background-size: 100% 10px;
+  opacity: 0.08;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+.app-shell {
+  width: min(100%, 72rem);
+  margin: 0 auto;
+  padding: 1rem 1rem 4rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.hero-panel,
+.state-panel,
+.summary-strip,
+.hand-section,
+.catalog-section {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.hero-panel,
+.state-panel,
+.hand-section,
+.catalog-section {
+  border-radius: 1.5rem;
+  padding: 1.25rem;
+}
+
+.summary-strip {
+  border-radius: 1.25rem;
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.summary-strip article,
+.pokemon-card,
+.catalog-list li {
+  border-radius: 1rem;
+  border: 1px solid rgba(145, 222, 255, 0.14);
+  background: var(--bg-soft);
+}
+
+.summary-strip article {
+  padding: 1rem;
+}
+
+.summary-strip span,
+.hero-meta dt,
+.card-stats dt,
+.catalog-list small,
+.state-kicker,
+.eyebrow {
+  color: var(--muted);
+}
+
+.summary-strip strong,
+h1,
+h2,
+h3 {
+  font-family: 'Chakra Petch', sans-serif;
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.2rem, 8vw, 4rem);
+  line-height: 0.96;
+  margin-top: 0.5rem;
+}
+
+h2 {
+  font-size: clamp(1.45rem, 6vw, 2.25rem);
+}
+
+.eyebrow,
+.state-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+}
+
+.hero-copy,
+.section-heading p,
+.state-panel p,
+.hero-meta dd,
+.catalog-list small,
+.card-stats dd {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.hero-copy {
+  max-width: 38rem;
+  margin-top: 1rem;
+}
+
+.hero-meta {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hero-meta div {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(145, 222, 255, 0.14);
+}
+
+.error-panel {
+  border-color: rgba(255, 141, 141, 0.35);
+}
+
+.primary-action {
+  margin-top: 1rem;
+  min-height: 44px;
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #05111a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-action:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
+
+.section-heading {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+.pokemon-card {
+  overflow: hidden;
+}
+
+.pokemon-card img {
+  width: 100%;
+  aspect-ratio: 1.45;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.card-body {
+  padding: 1rem;
+}
+
+.card-topline {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.type-pill {
+  display: inline-flex;
+  margin-top: 0.75rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(137, 240, 181, 0.12);
+  color: var(--accent);
+}
+
+.card-stats {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.catalog-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.catalog-list li {
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+@media (min-width: 700px) {
+  .app-shell {
+    padding: 1.5rem 1.5rem 5rem;
+    gap: 1.25rem;
+  }
+
+  .summary-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    padding-top: 2rem;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
