@@ -1,0 +1,84 @@
+.ar-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #04070d;
+}
+
+.ar-canvas {
+  width: 100%;
+  height: 100dvh;
+  touch-action: none;
+}
+
+.ar-hud {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 30;
+  display: grid;
+  gap: 0.75rem;
+  max-height: min(58dvh, 520px);
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  overflow: auto;
+  background: linear-gradient(180deg, rgba(4, 7, 13, 0) 0%, rgba(4, 7, 13, 0.92) 24%, rgba(4, 7, 13, 0.98) 100%);
+  pointer-events: auto;
+}
+
+.ar-hud-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ar-hud-top h1 {
+  margin: 0.2rem 0 0;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 1.35rem;
+}
+
+.ar-hud-status p {
+  margin: 0;
+}
+
+.ar-hud-meta {
+  margin-top: 0.35rem !important;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.ar-hud-actions {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.ar-hud-warning {
+  margin: 0;
+  color: #ffcc8d;
+  font-size: 0.92rem;
+}
+
+.ar-hud-log {
+  border-top: 1px solid var(--border);
+  padding-top: 0.65rem;
+}
+
+.ar-hud-log h2 {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+}
+
+.ar-hud-log ol {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.ar-hand-picker ul {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}

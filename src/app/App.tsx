@@ -1,9 +1,12 @@
-import { useEffect, useRef } from 'react';
-import { loadCards } from '../features/cards/cardRepository';
+import { useEffect, useRef, useState } from 'react';
+import { ArExperience } from '../features/ar/ArExperience';
 import { canAttack } from '../features/battle/gameEngine';
 import { useBattleStore } from '../features/battle/store';
 import type { GameState } from '../features/battle/types';
+import { loadCards } from '../features/cards/cardRepository';
 import { createPhaserBattleBridge, type PhaserBattleBridge } from '../game/phaserBridge';
+
+type ViewMode = 'classic' | 'ar';
 
 function PhaserBoard({ match }: { match: GameState }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +107,7 @@ function BattleCard({
 }
 
 export function App() {
+  const [viewMode, setViewMode] = useState<ViewMode>('classic');
   const {
     aesthetic,
     npcRuntime,
@@ -166,6 +170,10 @@ export function App() {
   const playerCanPass =
     match?.phase === 'player-turn' && match.turn === 'player' && !match.pendingNpc && !match.winner;
 
+  if (viewMode === 'ar' && catalogStatus === 'ready') {
+    return <ArExperience onExit={() => setViewMode('classic')} />;
+  }
+
   return (
     <main className="app-shell">
       <section className="hero-panel">
@@ -174,9 +182,19 @@ export function App() {
             <p className="eyebrow">Work Unit 3</p>
             <h1>Mesa Phaser + NPC HTTP opcional</h1>
           </div>
-          <button type="button" className="secondary-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
-            Nueva partida
-          </button>
+          <div className="hero-action-group">
+            <button type="button" className="secondary-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
+              Nueva partida
+            </button>
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => setViewMode('ar')}
+              disabled={catalogStatus !== 'ready'}
+            >
+              Modo AR
+            </button>
+          </div>
         </div>
 
         <p className="hero-copy">

@@ -9,7 +9,51 @@ npm install
 npm run dev
 ```
 
-Abrí la URL que te muestre Vite, elegí tu carta activa, asigná energía, atacá o pasá turno.
+Abrí la URL **HTTP** que muestre Vite (por ejemplo `http://localhost:5173`). En `localhost` el navegador no debería mostrar advertencias de certificado.
+
+### Si ves «La conexión no es privada» (`ERR_CERT_AUTHORITY_INVALID`)
+
+Eso pasa cuando usás **HTTPS con certificado autofirmado** (`npm run dev:https`). El servidor de desarrollo no usa un certificado de una autoridad pública; es normal en local.
+
+**Opción A (recomendada para jugar en PC):** usá HTTP sin certificado:
+
+```bash
+npm run dev
+```
+
+y entrá a `http://localhost:5173`.
+
+**Opción B (si necesitás HTTPS, p. ej. AR desde el celular en la red local):**
+
+```bash
+npm run dev:https
+```
+
+En Chrome/Edge: **Avanzado** → **Continuar a localhost (no seguro)**. En el celular el aviso es similar; solo aceptalo si confiás en tu propia red de desarrollo.
+
+**Opción C:** instalá [mkcert](https://github.com/FiloSottile/mkcert) y generá un certificado de confianza local (avanzado).
+
+## Modo AR (WebXR)
+
+La demo incluye un modo alternativo con **React Three Fiber + WebXR**:
+
+1. Cargá el catálogo y tocá **Modo AR** en la pantalla principal.
+2. En móvil compatible (p. ej. Chrome en Android), tocá **Iniciar AR** y permití la cámara.
+3. Tocá **Colocar mesa** apuntando a una superficie plana.
+4. Jugá con el HUD inferior (misma lógica que la vista clásica).
+
+Reglas visuales en AR:
+
+- **Jugador**: mano y Pokémon activo con la cara de la carta.
+- **Rival**: mano con reverso (`public/assets/card-back.svg`); Pokémon activo con cara visible (estilo TCG).
+
+Si tu dispositivo no soporta `immersive-ar`, usá **Vista previa 3D** para ver la mesa sin cámara (útil en desktop).
+
+Limitaciones conocidas:
+
+- WebAR en **móvil por IP de red** suele requerir **HTTPS** → usá `npm run dev:https` y aceptá el certificado local, o la **Vista previa 3D** en desktop con `npm run dev`.
+- En `http://localhost` muchas funciones (vista clásica y preview 3D) funcionan sin HTTPS.
+- iOS Safari tiene soporte WebXR limitado; priorizá Android/Chrome para AR completo.
 
 ## Backend opcional del NPC
 
@@ -53,6 +97,7 @@ Cobertura relevante de este slice:
 
 - `src/features/npc/httpNpcService.test.ts` verifica contrato simple, fallback y adapter legacy.
 - `src/features/battle/store.test.ts` verifica que el aviso de fallback llegue al log sin romper el loop.
+- `src/features/ar/mapMatchToArScene.test.ts` verifica cara/reverso por zona en la escena AR.
 
 ## Dataset
 
@@ -68,3 +113,4 @@ El catálogo local vive en `public/data/pokemon_cards_gen1.csv` y se filtra por 
 - adapter HTTP opcional encapsulado detrás de `httpNpcService.ts`
 - victoria/derrota cuando el HP activo llega a `0`
 - reinicio completo de partida con battle log limpio
+- modo AR WebXR alternable con vista clásica (Phaser + HUD 2D)
