@@ -101,7 +101,7 @@ describe('battleStore', () => {
     const npcService: NpcService = {
       decideAction: vi.fn(async () => {
         await new Promise((resolve) => setTimeout(resolve, 25));
-        return { type: 'attach-energy', reason: 'arma el turno offline' };
+        return { type: 'attach-energy' as const, reason: 'arma el turno offline' };
       }),
     };
     const store = createBattleStore(npcService);
@@ -126,9 +126,9 @@ describe('battleStore', () => {
   it('anota un aviso no bloqueante cuando el adapter HTTP cae y usa fallback local', async () => {
     const npcService: NpcService = {
       decideAction: vi.fn(async () => ({
-        type: 'pass',
+        type: 'pass' as const,
         reason: 'mock de contingencia',
-        source: 'mock',
+        source: 'mock' as const,
         notice: 'Backend NPC no disponible. Se usa mock local en este turno.',
       })),
     };

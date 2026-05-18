@@ -108,7 +108,7 @@ describe('HttpNpcService', () => {
 
   it('hace fallback al mock si fetch falla y agrega notice no bloqueante', async () => {
     const fallbackService: NpcService = {
-      decideAction: vi.fn(async () => ({ type: 'attach-energy', reason: 'mock seguro', source: 'mock' })),
+      decideAction: vi.fn(async () => ({ type: 'attach-energy' as const, reason: 'mock seguro', source: 'mock' as const })),
     };
     const service = new HttpNpcService({
       endpoint: 'http://127.0.0.1:8000/decide-action',
