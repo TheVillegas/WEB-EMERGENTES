@@ -70,8 +70,21 @@ export function CatalogRoom() {
   const [searchQuery,  setSearchQuery]  = useState('');
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
   const [hoverCard,    setHoverCard]    = useState<string | null>(null);
+  const [currentPanel, setCurrentPanel] = useState(0);
 
   const cards = useMemo(() => catalog.map(wrapAsCardCatalog), [catalog]);
+
+  const numPanels = Math.ceil(cards.length / PER_PANEL);
+
+  const panelLabels = useMemo(() => {
+    const labels: string[] = [];
+    for (let i = 0; i < cards.length; i += PER_PANEL) {
+      const card = cards[i];
+      const pIdx = Math.floor(i / PER_PANEL);
+      labels.push(card.type === 'Pokémon' ? `Pokémon (P. ${pIdx + 1})` : card.type);
+    }
+    return labels;
+  }, [cards]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -86,6 +99,7 @@ export function CatalogRoom() {
     const ctx = buildScene(mount, cards,
       (card) => setSelectedCard(card),
       (id)   => setHoverCard(id),
+      (idx)  => setCurrentPanel(idx)
     );
     sceneRef.current = ctx;
     return () => ctx.dispose();
@@ -105,10 +119,39 @@ export function CatalogRoom() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const handleGoToPanel = (idx: number) => {
+    sceneRef.current?.goToPanel(idx);
+    setCurrentPanel(idx);
+  };
+
+  const rootClass = `cr-root ${selectedCard ? 'cr-root--has-details' : ''} ${numPanels > 1 ? 'cr-root--has-pagination' : ''}`;
+
   return (
-    <div className="cr-root">
+    <div className={rootClass}>
       {/* 3D canvas host */}
       <div ref={mountRef} className="cr-canvas" />
+
+      {/* Left/Right Navigation Arrows */}
+      {numPanels > 1 && (
+        <>
+          <button 
+            className="cr-nav-arrow cr-nav-arrow--left"
+            onClick={() => handleGoToPanel(currentPanel - 1)}
+            disabled={currentPanel === 0}
+            aria-label="Página anterior"
+          >
+            &#10094;
+          </button>
+          <button 
+            className="cr-nav-arrow cr-nav-arrow--right"
+            onClick={() => handleGoToPanel(currentPanel + 1)}
+            disabled={currentPanel === numPanels - 1}
+            aria-label="Página siguiente"
+          >
+            &#10095;
+          </button>
+        </>
+      )}
 
       {/* Search overlay */}
       <div className="cr-search-bar">
@@ -132,6 +175,21 @@ export function CatalogRoom() {
       <div className="cr-badge">
         {filtered.length} carta{filtered.length !== 1 ? 's' : ''}
       </div>
+
+      {/* Pagination Bottom Bar */}
+      {numPanels > 1 && (
+        <div className="cr-pagination">
+          {panelLabels.map((label, idx) => (
+            <button
+              key={idx}
+              className={`cr-pagination-pill ${currentPanel === idx ? 'cr-pagination-pill--active' : ''}`}
+              onClick={() => handleGoToPanel(idx)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Navigation hint */}
       <div className="cr-hint">Arrastra para girar · Scroll para acercar · Click para detalles</div>
@@ -187,6 +245,7 @@ function buildScene(
   cards: CatalogCard[],
   onSelect: (c: CatalogCard) => void,
   onHover:  (name: string | null) => void,
+  onPanelChange: (idx: number) => void,
 ) {
   const placeholder = makePlaceholderTexture();
 
@@ -440,6 +499,17 @@ function buildScene(
   mount.addEventListener('mousemove', onMouseMove);
   mount.addEventListener('click',     onMouseClick);
 
+  // --- Auto Navigation Animation
+  let isAnimating = false;
+  let animTargetTheta = 0;
+  let animTargetPhi = 0;
+  let animTargetRadius = 0;
+  let lastReportedPanelIdx = -1;
+
+  controls.addEventListener('start', () => {
+    isAnimating = false;
+  });
+
   // --- Resize
   let raf = 0;
   function resize() {
@@ -457,7 +527,52 @@ function buildScene(
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const t = clock.getElapsedTime();
+
+      // Handle camera auto-navigation interpolation
+      if (isAnimating) {
+        const offset = new THREE.Vector3().copy(camera.position).sub(controls.target);
+        const spherical = new THREE.Spherical().setFromVector3(offset);
+
+        let thetaDiff = animTargetTheta - spherical.theta;
+        thetaDiff = Math.atan2(Math.sin(thetaDiff), Math.cos(thetaDiff)); // normalize to [-PI, PI]
+        
+        spherical.theta += thetaDiff * 0.08;
+        spherical.phi += (animTargetPhi - spherical.phi) * 0.08;
+        spherical.radius += (animTargetRadius - spherical.radius) * 0.08;
+        
+        offset.setFromSpherical(spherical);
+        camera.position.copy(controls.target).add(offset);
+        camera.lookAt(controls.target);
+
+        if (Math.abs(thetaDiff) < 0.001 &&
+            Math.abs(animTargetPhi - spherical.phi) < 0.001 &&
+            Math.abs(animTargetRadius - spherical.radius) < 0.001) {
+          isAnimating = false;
+        }
+      }
+
       controls.update();
+
+      // Detect closest panel for pagination feedback
+      const currentSpherical = new THREE.Spherical().setFromVector3(
+        new THREE.Vector3().copy(camera.position).sub(controls.target)
+      );
+      let closestIdx = 0;
+      let minDiff = Infinity;
+      for (let idx = 0; idx < numPanels; idx++) {
+        const pt = numPanels === 1 ? 0.5 : idx / (numPanels - 1);
+        const angle = -ARC_SPAN / 2 + pt * ARC_SPAN;
+        let diff = Math.abs(Math.atan2(Math.sin(angle - (-currentSpherical.theta)), Math.cos(angle - (-currentSpherical.theta))));
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = idx;
+        }
+      }
+      if (closestIdx !== lastReportedPanelIdx) {
+        lastReportedPanelIdx = closestIdx;
+        onPanelChange(closestIdx);
+      }
+
       particles.rotation.y = t * 0.018;
       (halo.material as THREE.MeshBasicMaterial).opacity = 0.10 + Math.sin(t * 1.1) * 0.03;
       blueKey.position.x   = Math.sin(t * 0.4) * 8;
@@ -468,8 +583,65 @@ function buildScene(
   }
   animate();
 
+  // --- Progressive Texture Loader
+  let isDisposed = false;
+  
+  const loadTextureAsync = (url: string) => new Promise<THREE.Texture | null>((resolve) => {
+    if (textureCache.has(url)) {
+      resolve(textureCache.get(url)!);
+    } else {
+      loader.load(
+        url,
+        (t) => { textureCache.set(url, t); resolve(t); },
+        undefined,
+        () => resolve(null)
+      );
+    }
+  });
+
+  const progressiveLoad = async () => {
+    // Wait a brief moment to prioritize initial scene render and user interaction
+    await new Promise(r => setTimeout(r, 1000));
+    
+    const toLoad = [...cardMeshes];
+    const chunkSize = 4;
+    
+    for (let i = 0; i < toLoad.length; i += chunkSize) {
+      if (isDisposed) break;
+      const chunk = toLoad.slice(i, i + chunkSize);
+      
+      await Promise.all(chunk.map(async (entry) => {
+        const url = entry.card.imageSmall;
+        if (!url) return;
+        
+        const mat = entry.mesh.material as THREE.MeshStandardMaterial;
+        // If already loaded by hover (not using placeholder anymore), skip
+        if (mat.map !== placeholder) return;
+        
+        const tex = await loadTextureAsync(url);
+        if (tex && !isDisposed && mat.map === placeholder) {
+          mat.map = tex;
+          mat.needsUpdate = true;
+        }
+      }));
+      
+      // Yield to main thread / network
+      await new Promise(r => setTimeout(r, 100));
+    }
+  };
+
+  progressiveLoad();
+
   return {
     resize,
+    goToPanel: (panelIdx: number) => {
+      const pt = numPanels === 1 ? 0.5 : panelIdx / (numPanels - 1);
+      const panelAngle = -ARC_SPAN / 2 + pt * ARC_SPAN;
+      animTargetTheta = -panelAngle;
+      animTargetPhi = Math.PI * 0.46;
+      animTargetRadius = 11;
+      isAnimating = true;
+    },
     filterCards: (query: string) => {
       const q = query.trim().toLowerCase();
       cardMeshes.forEach(({ mesh, card }) => {
@@ -482,6 +654,7 @@ function buildScene(
       });
     },
     dispose() {
+      isDisposed = true;
       cancelAnimationFrame(raf);
       mount.removeEventListener('mousemove', onMouseMove);
       mount.removeEventListener('click',     onMouseClick);
