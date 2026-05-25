@@ -6,8 +6,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-// @ts-ignore - WebGPURenderer has no type definitions yet in @types/three
-import { WebGPURenderer } from 'three/webgpu';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useBattleStore } from '../battle/store';
 import { wrapAsCardCatalog } from './catalogUtils';
@@ -80,18 +78,25 @@ export function CatalogRoom() {
     return q ? cards.filter(c => c.name.toLowerCase().includes(q)) : cards;
   }, [cards, searchQuery]);
 
-  // (Re-)build scene whenever card list changes
+  // Build scene exactly ONCE for all cards
   useEffect(() => {
     const mount = mountRef.current;
-    if (!mount || filtered.length === 0) return;
+    if (!mount || cards.length === 0) return;
 
-    const ctx = buildScene(mount, filtered,
+    const ctx = buildScene(mount, cards,
       (card) => setSelectedCard(card),
       (id)   => setHoverCard(id),
     );
     sceneRef.current = ctx;
     return () => ctx.dispose();
-  }, [filtered]);
+  }, [cards]);
+
+  // Filter cards instantly when search query changes
+  useEffect(() => {
+    if (sceneRef.current) {
+      sceneRef.current.filterCards(searchQuery);
+    }
+  }, [searchQuery]);
 
   // Sync window resize
   useEffect(() => {
@@ -186,8 +191,8 @@ function buildScene(
   const placeholder = makePlaceholderTexture();
 
   // --- Renderer
-  const renderer = new WebGPURenderer({ antialias: true, alpha: true }) as any;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setClearColor(0x040c18, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.1;
@@ -448,8 +453,7 @@ function buildScene(
 
   // --- Animate
   const clock = new THREE.Clock();
-  async function animate() {
-    await renderer.init();
+  function animate() {
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const t = clock.getElapsedTime();
@@ -462,10 +466,21 @@ function buildScene(
     };
     loop();
   }
-  void animate();
+  animate();
 
   return {
     resize,
+    filterCards: (query: string) => {
+      const q = query.trim().toLowerCase();
+      cardMeshes.forEach(({ mesh, card }) => {
+        const matches = !q || card.name.toLowerCase().includes(q);
+        mesh.visible = matches;
+        const border = mesh.userData.border as THREE.Mesh | undefined;
+        if (border) {
+          border.visible = matches;
+        }
+      });
+    },
     dispose() {
       cancelAnimationFrame(raf);
       mount.removeEventListener('mousemove', onMouseMove);

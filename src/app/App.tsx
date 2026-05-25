@@ -16,6 +16,14 @@ type AttackFx = {
   damage: number;
 };
 
+const preloadedUrls = new Set<string>();
+function preloadImage(url: string) {
+  if (!url || preloadedUrls.has(url)) return;
+  preloadedUrls.add(url);
+  const img = new Image();
+  img.src = url;
+}
+
 function getPhaseLabel(phase: TurnPhase, match: GameState): string {
   if (phase === 'selecting-active') return 'Elegir carta';
   if (phase === 'npc-turn') return 'Turno NPC';
@@ -238,6 +246,23 @@ export function App() {
   useEffect(() => {
     if (!match) return;
 
+    if (match.playerActive) {
+      if (match.playerActive.imageSmall) preloadImage(match.playerActive.imageSmall);
+      if (match.playerActive.imageLarge) preloadImage(match.playerActive.imageLarge);
+    }
+    if (match.npcActive) {
+      if (match.npcActive.imageSmall) preloadImage(match.npcActive.imageSmall);
+      if (match.npcActive.imageLarge) preloadImage(match.npcActive.imageLarge);
+    }
+    for (const card of match.playerHand) {
+      if (card.imageSmall) preloadImage(card.imageSmall);
+      if (card.imageLarge) preloadImage(card.imageLarge);
+    }
+  }, [match?.playerHand, match?.playerActive, match?.npcActive]);
+
+  useEffect(() => {
+    if (!match) return;
+
     const previous = previousMatchRef.current;
     if (previous) {
       const npcDamage = previous.npcActive && match.npcActive ? previous.npcActive.currentHp - match.npcActive.currentHp : 0;
@@ -373,9 +398,9 @@ export function App() {
         </div>
       ) : null}
 
-      {/* Battle arena — always mounted so state is preserved */}
+      {/* Battle arena — mounted only when view is battle to save GPU */}
       <div style={{ display: view === 'battle' ? 'contents' : 'none' }}>
-        <ThreeArena />
+        {view === 'battle' && <ThreeArena />}
 
         {catalogStatus === 'loading' ? <section className="system-overlay"><h2>Preparando la arena...</h2></section> : null}
         {catalogStatus === 'error' ? <section className="system-overlay"><h2>No se pudo levantar la demo</h2><p>{errorMessage}</p></section> : null}

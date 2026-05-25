@@ -24,10 +24,16 @@ export function normalizeCatalog(rows: CsvCardRow[]): Card[] {
     .filter((card): card is Card => card !== null);
 }
 
+let cachedCards: Card[] | null = null;
+
 export async function loadCards(
   fetcher: typeof fetch = fetch,
   source: string = CATALOG_URL,
 ): Promise<Card[]> {
+  if (cachedCards && source === CATALOG_URL) {
+    return cachedCards;
+  }
+
   const response = await fetcher(source);
 
   if (!response.ok) {
@@ -39,6 +45,10 @@ export async function loadCards(
 
   if (cards.length === 0) {
     throw new Error('El catálogo local no devolvió cartas Pokémon.');
+  }
+
+  if (source === CATALOG_URL) {
+    cachedCards = cards;
   }
 
   return cards;

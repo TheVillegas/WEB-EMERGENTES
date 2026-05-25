@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-// @ts-ignore - WebGPURenderer has no type definitions yet in @types/three
-import { WebGPURenderer } from 'three/webgpu';
+// WebGPURenderer replaced by standard WebGLRenderer for better performance
 
 export function ThreeArena() {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -119,13 +118,12 @@ export function ThreeArena() {
       renderer.setSize(width, height);
     };
 
-    const init = async () => {
-      renderer = new WebGPURenderer({ alpha: true, antialias: true }) as any;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+    const init = () => {
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setClearAlpha(0);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.08;
-      await renderer.init();
 
       if (!mounted) return;
       host.appendChild(renderer.domElement);
@@ -153,7 +151,7 @@ export function ThreeArena() {
       animate();
     };
 
-    void init();
+    init();
     window.addEventListener('resize', resize);
 
     return () => {
