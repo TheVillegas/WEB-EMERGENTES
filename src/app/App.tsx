@@ -201,6 +201,7 @@ export function App() {
   const playerActiveRef = useRef<HTMLDivElement | null>(null);
   const npcActiveRef = useRef<HTMLDivElement | null>(null);
   const previousMatchRef = useRef<GameState | null>(null);
+  const resultAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -291,6 +292,25 @@ export function App() {
       gsap.set([playerActiveRef.current, npcActiveRef.current], { clearProps: 'all' });
     }
   }, [match?.matchId]);
+
+  useEffect(() => {
+    if (showResult && match?.winner) {
+      const audioUrl = match.winner === 'player' 
+        ? '/audio/music/Results-Victory.mp3' 
+        : '/audio/music/Results-Defeat.mp3';
+      const audio = new Audio(audioUrl);
+      audio.volume = 0.5;
+      audio.loop = true;
+      audio.play().catch(() => {});
+      resultAudioRef.current = audio;
+    } else if (!showResult) {
+      if (resultAudioRef.current) {
+        resultAudioRef.current.pause();
+        resultAudioRef.current.currentTime = 0;
+        resultAudioRef.current = null;
+      }
+    }
+  }, [showResult, match?.winner]);
 
   useGSAP(
     () => {
