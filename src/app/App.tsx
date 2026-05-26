@@ -316,21 +316,21 @@ export function App() {
       const defenderCard = fromPlayer ? npcActiveRef.current : playerActiveRef.current;
       const tl = gsap.timeline();
 
-      gsap.set(beamRef.current, { opacity: 0, scaleY: 0.15, rotate: fromPlayer ? -10 : 10, transformOrigin: fromPlayer ? 'bottom center' : 'top center' });
-      gsap.set(damageRef.current, { opacity: 0, y: fromPlayer ? -14 : 14, scale: 0.8 });
+      gsap.set(beamRef.current, { opacity: 0, scaleX: 0.15, rotate: 0, transformOrigin: fromPlayer ? 'right center' : 'left center' });
+      gsap.set(damageRef.current, { opacity: 0, x: fromPlayer ? -14 : 14, scale: 0.8 });
 
       if (attackerCard) {
-        tl.fromTo(attackerCard, { y: 0, scale: 1 }, { y: fromPlayer ? -20 : 20, scale: 1.04, duration: 0.16, ease: 'power2.out', yoyo: true, repeat: 1 }, 0);
+        tl.fromTo(attackerCard, { x: 0, scale: 1 }, { x: fromPlayer ? -20 : 20, scale: 1.04, duration: 0.16, ease: 'power2.out', yoyo: true, repeat: 1 }, 0);
       }
 
       if (defenderCard) {
         tl.fromTo(defenderCard, { filter: 'brightness(1)', x: 0 }, { filter: 'brightness(1.45)', x: 8, duration: 0.08, ease: 'power1.inOut', yoyo: true, repeat: 3 }, 0.14);
       }
 
-      tl.to(beamRef.current, { opacity: 1, scaleY: 1, duration: 0.16, ease: 'power2.out' })
+      tl.to(beamRef.current, { opacity: 1, scaleX: 1, duration: 0.16, ease: 'power2.out' })
         .to(beamRef.current, { opacity: 0, duration: 0.18, ease: 'power1.in' })
-        .to(damageRef.current, { opacity: 1, y: 0, scale: 1, duration: 0.18, ease: 'back.out(1.8)' }, '-=0.14')
-        .to(damageRef.current, { opacity: 0, y: fromPlayer ? -30 : 30, duration: 0.45, ease: 'power2.out' }, '+=0.12')
+        .to(damageRef.current, { opacity: 1, x: 0, scale: 1, duration: 0.18, ease: 'back.out(1.8)' }, '-=0.14')
+        .to(damageRef.current, { opacity: 0, x: fromPlayer ? -30 : 30, duration: 0.45, ease: 'power2.out' }, '+=0.12')
         .call(() => setAttackFx(null));
     },
     { dependencies: [attackFx?.key] },
@@ -453,8 +453,8 @@ export function App() {
                   <div className={`damage-badge damage-badge--${attackFx?.attacker === 'player' ? 'top' : 'bottom'} ${attackFx ? 'is-active' : ''}`} ref={damageRef}>-{attackFx?.damage ?? 0}</div>
                 </div>
 
-                <div className="player-deck-slot"><ZonePile label="Deck" /></div>
-                <div className="player-discard-slot"><ZonePile label="Discard" /></div>
+                <div className={`player-deck-slot ${match.phase !== 'selecting-active' ? 'is-hidden' : ''}`}><ZonePile label="Deck" /></div>
+                <div className={`player-discard-slot ${match.phase !== 'selecting-active' ? 'is-hidden' : ''}`}><ZonePile label="Discard" /></div>
                 <div className="player-bench-row"><BenchSlots owner="player" /></div>
                 <div className="player-active-slot" ref={playerSlotRef}>
                   <div className="active-wrapper" ref={playerActiveRef}>
@@ -471,7 +471,7 @@ export function App() {
                 {match.playerActive ? <div className="energy-sidecar"><span className="eyebrow">Energía</span><strong>{match.playerActive.energy}/{match.playerActive.attackCost}</strong></div> : null}
               </div>
 
-              <div className="player-hand-zone">
+              <div className={`player-hand-zone ${match.phase !== 'selecting-active' ? 'is-hidden' : ''}`}>
                 <div className="player-hand-zone__header">
                   <p className="eyebrow">Mano del jugador</p>
                   <span className="chip">{match.playerHand.length} cartas</span>
@@ -479,9 +479,6 @@ export function App() {
 
                 <div className="hand-fan">
                   {match.playerHand.map((card, index) => {
-                    const middle = (match.playerHand.length - 1) / 2;
-                    const rotation = (index - middle) * 8;
-
                     return (
                       <article
                         key={card.id}
@@ -490,7 +487,6 @@ export function App() {
                           handRefs.current[index] = node;
                           handCardMapRef.current[card.id] = node;
                         }}
-                        style={{ '--rotation': `${rotation}deg`, '--offset': `${Math.abs(index - middle) * 10}px` } as React.CSSProperties}
                       >
                         <div className="hand-card__image">
                           <img src={card.imageLarge || card.imageSmall} alt={`Carta de ${card.name}`} loading="lazy" />
