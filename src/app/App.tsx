@@ -14,6 +14,7 @@ type AttackFx = {
   key: number;
   attacker: 'player' | 'npc';
   damage: number;
+  lethal?: boolean;
 };
 
 const preloadedUrls = new Set<string>();
@@ -172,6 +173,7 @@ type AppView = 'battle' | 'catalog';
 
 export function App() {
   const [view, setView] = useState<AppView>('battle');
+  const [showResult, setShowResult] = useState(false);
   const {
     catalogStatus,
     errorMessage,
@@ -268,12 +270,27 @@ export function App() {
       const npcDamage = previous.npcActive && match.npcActive ? previous.npcActive.currentHp - match.npcActive.currentHp : 0;
       const playerDamage = previous.playerActive && match.playerActive ? previous.playerActive.currentHp - match.playerActive.currentHp : 0;
 
-      if (npcDamage > 0) setAttackFx({ key: Date.now(), attacker: 'player', damage: npcDamage });
-      else if (playerDamage > 0) setAttackFx({ key: Date.now(), attacker: 'npc', damage: playerDamage });
+      if (npcDamage > 0) setAttackFx({ key: Date.now(), attacker: 'player', damage: npcDamage, lethal: match.npcActive?.currentHp === 0 });
+      else if (playerDamage > 0) setAttackFx({ key: Date.now(), attacker: 'npc', damage: playerDamage, lethal: match.playerActive?.currentHp === 0 });
     }
 
     previousMatchRef.current = match;
   }, [match]);
+
+  useEffect(() => {
+    if (match?.winner) {
+      const timer = setTimeout(() => setShowResult(true), 2500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowResult(false);
+    }
+  }, [match?.winner]);
+
+  useEffect(() => {
+    if (match?.matchId) {
+      gsap.set([playerActiveRef.current, npcActiveRef.current], { clearProps: 'all' });
+    }
+  }, [match?.matchId]);
 
   useGSAP(
     () => {
@@ -325,6 +342,12 @@ export function App() {
 
       if (defenderCard) {
         tl.fromTo(defenderCard, { filter: 'brightness(1)', x: 0 }, { filter: 'brightness(1.45)', x: 8, duration: 0.08, ease: 'power1.inOut', yoyo: true, repeat: 3 }, 0.14);
+        
+        if (attackFx.lethal) {
+          tl.to(defenderCard, { filter: 'sepia(1) hue-rotate(-50deg) saturate(5) brightness(0.4)', duration: 0.6, ease: 'power2.out' }, '+=0.1');
+        } else {
+          tl.set(defenderCard, { clearProps: 'filter,x' });
+        }
       }
 
       tl.to(beamRef.current, { opacity: 1, scaleX: 1, duration: 0.16, ease: 'power2.out' })
@@ -338,10 +361,10 @@ export function App() {
 
   useGSAP(
     () => {
-      if (!match?.winner || !resultPanelRef.current) return;
+      if (!showResult || !resultPanelRef.current) return;
       gsap.fromTo(resultPanelRef.current, { opacity: 0, scale: 0.94, y: 24 }, { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: 'power3.out' });
     },
-    { dependencies: [match?.winner] },
+    { dependencies: [showResult] },
   );
 
   const handleSelectPlayerActive = (cardId: string) => {
@@ -528,7 +551,7 @@ export function App() {
               </section>
             </div>
 
-            {match.winner ? (
+            {showResult ? (
               <section className="result-overlay">
                 <div className="result-overlay__backdrop" />
                 <div className="result-panel" ref={resultPanelRef}>
