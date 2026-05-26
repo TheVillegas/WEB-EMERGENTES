@@ -341,6 +341,12 @@ export function App() {
       }
 
       if (defenderCard) {
+        tl.call(() => {
+          const sfx = new Audio('/audio/sfx/damaged.wav');
+          sfx.volume = 0.5;
+          sfx.play().catch(() => {});
+        }, undefined, 0.14);
+
         tl.fromTo(defenderCard, { filter: 'brightness(1)', x: 0 }, { filter: 'brightness(1.45)', x: 8, duration: 0.08, ease: 'power1.inOut', yoyo: true, repeat: 3 }, 0.14);
         
         if (attackFx.lethal) {
