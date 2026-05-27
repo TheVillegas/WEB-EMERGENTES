@@ -1,5 +1,8 @@
 import type { Card } from '../cards/types';
 
+export type DeckType = 'Fuego' | 'Agua' | 'Planta';
+export type Difficulty = 'Fácil' | 'Normal' | 'Difícil';
+
 export type TurnOwner = 'player' | 'npc';
 
 export type TurnPhase = 'loading' | 'selecting-active' | 'player-turn' | 'npc-turn' | 'game-over';

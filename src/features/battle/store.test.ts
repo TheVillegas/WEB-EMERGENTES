@@ -87,6 +87,7 @@ describe('battleStore', () => {
     const store = createBattleStore({ decideAction: vi.fn() } as unknown as NpcService);
 
     store.getState().initializeCatalog(catalog);
+    store.getState().startMatch();
     store.getState().selectPlayerActive('bulbasaur-0');
 
     const match = store.getState().match;
@@ -107,6 +108,7 @@ describe('battleStore', () => {
     const store = createBattleStore(npcService);
 
     store.getState().initializeCatalog(catalog);
+    store.getState().startMatch();
     store.getState().selectPlayerActive('charmander-1');
     store.getState().assignPlayerEnergy();
 
@@ -135,6 +137,7 @@ describe('battleStore', () => {
     const store = createBattleStore(npcService);
 
     store.getState().initializeCatalog(catalog);
+    store.getState().startMatch();
     store.getState().selectPlayerActive('charmander-1');
 
     await store.getState().passPlayerTurn();

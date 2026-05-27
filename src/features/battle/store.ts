@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { assignEnergy, canAttack, createMatch, passTurn, playCard, resetMatch, resolveAttack } from './gameEngine';
-import type { GameState } from './types';
+import type { DeckType, Difficulty, GameState } from './types';
 import type { Card } from '../cards/types';
 import { createNpcService, getNpcRuntimeConfig, type NpcService } from '../npc/npcService';
 
@@ -19,9 +19,13 @@ export type BattleStoreState = {
   errorMessage: string | null;
   catalog: Card[];
   match: GameState | null;
+  selectedDeck: DeckType | null;
+  selectedDifficulty: Difficulty | null;
   setCatalogLoading: () => void;
   setCatalogError: (message: string) => void;
   initializeCatalog: (cards: Card[]) => void;
+  setDeck: (deck: DeckType) => void;
+  setDifficulty: (difficulty: Difficulty) => void;
   startMatch: () => void;
   selectPlayerActive: (cardId: string) => void;
   assignPlayerEnergy: () => void;
@@ -87,22 +91,23 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
     errorMessage: null,
     catalog: [],
     match: null,
+    selectedDeck: null,
+    selectedDifficulty: null,
     setCatalogLoading: () => set(() => ({ catalogStatus: 'loading', errorMessage: null })),
     setCatalogError: (message) => set(() => ({ catalogStatus: 'error', errorMessage: message })),
     initializeCatalog: (cards) =>
       set(() => {
-        const match = createMatch(cards, 1);
-
         return {
           catalogStatus: 'ready',
           errorMessage: null,
           catalog: cards,
-          match,
         };
       }),
+    setDeck: (deck) => set(() => ({ selectedDeck: deck })),
+    setDifficulty: (difficulty) => set(() => ({ selectedDifficulty: difficulty })),
     startMatch: () =>
       set((state) => ({
-        match: createMatch(state.catalog, (state.match?.matchId ?? 0) + 1),
+        match: createMatch(state.catalog, (state.match?.matchId ?? 0) + 1, state.selectedDeck || 'Fuego', state.selectedDifficulty || 'Normal'),
       })),
     selectPlayerActive: (cardId) =>
       set((state) => ({
@@ -142,7 +147,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
     },
     resetCurrentMatch: () =>
       set((state) => ({
-        match: state.match ? resetMatch(state.match) : createMatch(state.catalog, 1),
+        match: createMatch(state.catalog, (state.match?.matchId ?? 0) + 1, state.selectedDeck || 'Fuego', state.selectedDifficulty || 'Normal'),
       })),
   }));
 }

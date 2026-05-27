@@ -7,6 +7,9 @@ import { useBattleStore } from '../features/battle/store';
 import type { Battler, GameState, TurnPhase } from '../features/battle/types';
 import { ThreeArena } from '../game/ThreeArena';
 import { CatalogPage } from '../features/catalog/CatalogPage';
+import { MainMenu } from './MainMenu';
+import { DeckSelection } from '../DeckSeleccion/DeckSelection';
+import { DifficultySelection } from './DifficultySelection';
 
 gsap.registerPlugin(useGSAP);
 
@@ -168,10 +171,11 @@ function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'play
   );
 }
 
-type AppView = 'battle' | 'catalog';
+type AppView = 'menu' | 'deck-selection' | 'difficulty-selection' | 'battle' | 'catalog';
 
 export function App() {
-  const [view, setView] = useState<AppView>('battle');
+  const [view, setView] = useState<AppView>('menu');
+  const [previousView, setPreviousView] = useState<AppView>('menu');
   const {
     catalogStatus,
     errorMessage,
@@ -388,15 +392,21 @@ export function App() {
               type="button"
               id="catalog-back-btn"
               className="secondary-action catalog-nav-btn"
-              onClick={() => setView('battle')}
-              aria-label="Volver a la batalla"
+              onClick={() => setView(previousView)}
+              aria-label={previousView === 'menu' ? "Volver al menú" : "Volver a la batalla"}
             >
-              ← Volver a la batalla
+              ← {previousView === 'menu' ? 'Volver al menú' : 'Volver a la batalla'}
             </button>
           </div>
           <CatalogPage />
         </div>
       ) : null}
+
+      {view === 'menu' ? <MainMenu onStart={() => setView('deck-selection')} onCatalog={() => { setPreviousView('menu'); setView('catalog'); }} /> : null}
+      
+      {view === 'deck-selection' ? <DeckSelection onSelect={() => setView('difficulty-selection')} onBack={() => setView('menu')} /> : null}
+      
+      {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => { startMatch(); setView('battle'); }} onBack={() => setView('deck-selection')} /> : null}
 
       {/* Battle arena — mounted only when view is battle to save GPU */}
       <div style={{ display: view === 'battle' ? 'contents' : 'none' }}>
@@ -421,6 +431,9 @@ export function App() {
                 </div>
 
                 <div className="hud-actions">
+                  <button type="button" className="secondary-action compact-action" onClick={() => setView('menu')}>
+                    Menú Principal
+                  </button>
                   <button type="button" className="secondary-action compact-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
                     Nueva partida
                   </button>
@@ -428,7 +441,7 @@ export function App() {
                     type="button"
                     id="open-catalog-btn"
                     className="secondary-action compact-action catalog-nav-btn"
-                    onClick={() => setView('catalog')}
+                    onClick={() => { setPreviousView('battle'); setView('catalog'); }}
                     aria-label="Abrir catálogo de cartas"
                   >
                     📖 Catálogo
