@@ -17,8 +17,8 @@ export function ThreeArena() {
     scene.fog = new THREE.Fog(0x04101f, 10, 26);
 
     const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-    camera.position.set(0, 5.4, 9.8);
-    camera.lookAt(0, 0.3, 0);
+    camera.position.set(0, 11.5, 3.5);
+    camera.lookAt(0, 0, 0);
 
     scene.add(new THREE.AmbientLight(0x90d7ff, 0.9));
 
@@ -141,8 +141,8 @@ export function ThreeArena() {
         centerLine.material.opacity = 0.18 + Math.sin(elapsed * 2.2) * 0.05;
         ambientHalo.material.opacity = 0.06 + Math.cos(elapsed * 1.3) * 0.02;
         camera.position.x = Math.sin(elapsed * 0.32) * 0.22;
-        camera.position.y = 5.4 + Math.cos(elapsed * 0.4) * 0.08;
-        camera.lookAt(0, 0.2, 0);
+        camera.position.y = 11.5 + Math.cos(elapsed * 0.4) * 0.08;
+        camera.lookAt(0, 0, 0);
 
         renderer.render(scene, camera);
         frame = requestAnimationFrame(animate);
