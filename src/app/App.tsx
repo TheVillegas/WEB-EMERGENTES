@@ -175,13 +175,9 @@ function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'play
 type AppView = 'menu' | 'deck-selection' | 'difficulty-selection' | 'battle' | 'catalog';
 
 export function App() {
-<<<<<<< HEAD
   const [view, setView] = useState<AppView>('menu');
   const [previousView, setPreviousView] = useState<AppView>('menu');
-=======
-  const [view, setView] = useState<AppView>('battle');
   const [showResult, setShowResult] = useState(false);
->>>>>>> origin/feature-tomas/cambio-de-perspectiva-de-batalla
   const {
     catalogStatus,
     errorMessage,
@@ -211,6 +207,21 @@ export function App() {
   const previousMatchRef = useRef<GameState | null>(null);
   const resultAudioRef = useRef<HTMLAudioElement | null>(null);
   const battleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUnlockedRef = useRef(false);
+
+  // Desbloquea el autoplay del navegador en el primer click del usuario
+  const unlockAudio = () => {
+    if (audioUnlockedRef.current) return;
+    audioUnlockedRef.current = true;
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    ctx.resume().catch(() => { });
+    // Reproduce un buffer silencioso para "desbloquear" <audio> también
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  };
 
   useEffect(() => {
     let active = true;
@@ -304,13 +315,13 @@ export function App() {
 
   useEffect(() => {
     if (showResult && match?.winner) {
-      const audioUrl = match.winner === 'player' 
-        ? '/audio/music/Results-Victory.mp3' 
+      const audioUrl = match.winner === 'player'
+        ? '/audio/music/Results-Victory.mp3'
         : '/audio/music/Results-Defeat.mp3';
       const audio = new Audio(audioUrl);
       audio.volume = 0.5;
       audio.loop = true;
-      audio.play().catch(() => {});
+      audio.play().catch(() => { });
       resultAudioRef.current = audio;
     } else if (!showResult) {
       if (resultAudioRef.current) {
@@ -330,7 +341,7 @@ export function App() {
         const audio = new Audio('/audio/music/Battle-Music.mp3');
         audio.volume = 0.35;
         audio.loop = true;
-        audio.play().catch(() => {});
+        audio.play().catch(() => { });
         battleAudioRef.current = audio;
       }
     } else {
@@ -394,11 +405,11 @@ export function App() {
         tl.call(() => {
           const sfx = new Audio('/audio/sfx/damaged.wav');
           sfx.volume = 0.5;
-          sfx.play().catch(() => {});
+          sfx.play().catch(() => { });
         }, undefined, 0.14);
 
         tl.fromTo(defenderCard, { filter: 'brightness(1)', x: 0 }, { filter: 'brightness(1.45)', x: 8, duration: 0.08, ease: 'power1.inOut', yoyo: true, repeat: 3 }, 0.14);
-        
+
         if (attackFx.lethal) {
           tl.to(defenderCard, { filter: 'sepia(1) hue-rotate(-50deg) saturate(5) brightness(0.4)', duration: 0.6, ease: 'power2.out' }, '+=0.1');
         } else {
@@ -477,10 +488,10 @@ export function App() {
         </div>
       ) : null}
 
-      {view === 'menu' ? <MainMenu onStart={() => setView('deck-selection')} onCatalog={() => { setPreviousView('menu'); setView('catalog'); }} /> : null}
-      
+      {view === 'menu' ? <MainMenu onStart={() => { unlockAudio(); setView('deck-selection'); }} onCatalog={() => { unlockAudio(); setPreviousView('menu'); setView('catalog'); }} /> : null}
+
       {view === 'deck-selection' ? <DeckSelection onSelect={() => setView('difficulty-selection')} onBack={() => setView('menu')} /> : null}
-      
+
       {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => { startMatch(); setView('battle'); }} onBack={() => setView('deck-selection')} /> : null}
 
       {/* Battle arena — mounted only when view is battle to save GPU */}
@@ -648,7 +659,10 @@ export function App() {
                     ) : null}
                   </div>
 
-                  <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>
+                  <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+                    <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>
+                    <button type="button" className="secondary-action" onClick={() => { resetCurrentMatch(); setView('menu'); }}>Menú Principal</button>
+                  </div>
                 </div>
               </section>
             ) : null}
