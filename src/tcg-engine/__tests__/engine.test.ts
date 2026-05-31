@@ -478,12 +478,17 @@ describe('endTurn', () => {
 });
 
 describe('drawCard', () => {
-  it('draws one card from deck', () => {
-    let state = createTestState();
+  it('draws one card from deck (after first turn)', () => {
+    const bigDeck = Array(10).fill(null).map((_, i) =>
+      testPokemon(`Pokemon ${i}`, 'grass', 40)
+    );
+    let state = createTestState({ deck: bigDeck });
+    state.turnNumber = 2;
+    const originalHandSize = state.players.p1.hand.length;
     const originalDeckSize = state.players.p1.deck.length;
     state = drawCard(state, 'p1');
-    expect(state.players.p1.hand.length).toBe(state.players.p1.hand.length);
-    expect(state.players.p1.deck.length).toBeLessThanOrEqual(originalDeckSize);
+    expect(state.players.p1.hand.length).toBe(originalHandSize + 1);
+    expect(state.players.p1.deck.length).toBe(originalDeckSize - 1);
   });
 
   it('does not exceed hand limit', () => {
