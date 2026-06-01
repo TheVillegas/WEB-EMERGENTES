@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import gsap from 'gsap';
+import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { loadCards } from '../features/cards/cardRepository';
 import { canAttack } from '../features/battle/gameEngine';
