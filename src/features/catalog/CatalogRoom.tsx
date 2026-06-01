@@ -1,9 +1,3 @@
-/**
- * CatalogRoom – immersive 3D card gallery.
- * Cards are laid out on curved panels arranged in a 270° arc (like a rotunda).
- * The user orbits with drag / scroll, hovers cards to highlight them, and
- * clicks to open a details panel.  All Three.js; no React Three Fiber.
- */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -14,13 +8,11 @@ import type { CatalogCard } from './types';
 // ─── Layout constants ──────────────────────────────────────────────────────
 const CARD_W = 1.4;
 const CARD_H = 2.0;
-const GAP_X  = 0.22;
-const GAP_Y  = 0.30;
-const COLS   = 8;
-const ROWS   = 6;
-const PER_PANEL  = COLS * ROWS;          // 48 cards per panel
-const ARC_RADIUS = 15;                   // panels sit at this radius
-const ARC_SPAN   = (Math.PI * 3) / 2;   // 270 °
+const GAP_X = 0.22;
+const GAP_Y = 0.30;
+const COLS = 8;
+const ROWS = 6;
+const PER_PANEL = COLS * ROWS;          // 48 cards per panel
 
 // Type colour palette keyed on card type
 const TYPE_COLORS: Record<string, string> = {
@@ -31,12 +23,29 @@ const TYPE_COLORS: Record<string, string> = {
   Entrenador: '#5c6bc0', Energía: '#ffd54f',
 };
 
-function typeColor(card: CatalogCard): THREE.Color {
-  const hex = TYPE_COLORS[card.type] ?? TYPE_COLORS['Colorless'];
+const TYPE_ORDER = [
+  'Grass', 'Fire', 'Water', 'Lightning', 'Psychic',
+  'Fighting', 'Dark', 'Metal', 'Colorless', 'Dragon',
+] as const;
+
+function typeColor(type: string): THREE.Color {
+  const hex = TYPE_COLORS[type] ?? TYPE_COLORS['Colorless'];
   return new THREE.Color(hex);
 }
 
-// ─── Placeholder texture (card back) ──────────────────────────────────────
+function groupByType(cards: CatalogCard[]): Array<{ type: string; cards: CatalogCard[] }> {
+  const buckets = new Map<string, CatalogCard[]>();
+  for (const t of TYPE_ORDER) buckets.set(t, []);
+  for (const card of cards) {
+    let t = card.type;
+    if (t === 'Darkness') t = 'Dark';
+    if (!buckets.has(t)) t = 'Colorless';
+    buckets.get(t)!.push(card);
+  }
+  return TYPE_ORDER.map(type => ({ type, cards: buckets.get(type)! }));
+}
+
+// ─── Textures ─────────────────────────────────────────────────────────────
 function makePlaceholderTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 140; canvas.height = 200;
@@ -53,6 +62,26 @@ function makePlaceholderTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(canvas);
 }
 
+function makeBackTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 280; c.height = 400;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(140, 200, 20, 140, 200, 220);
+  g.addColorStop(0, '#1a0533');
+  g.addColorStop(1, '#080112');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 280, 400);
+  ctx.strokeStyle = '#7c3aed88'; ctx.lineWidth = 5;
+  ctx.strokeRect(8, 8, 264, 384);
+  ctx.strokeStyle = '#a855f744'; ctx.lineWidth = 2;
+  ctx.strokeRect(16, 16, 248, 368);
+  ctx.font = 'bold 64px sans-serif'; ctx.fillStyle = '#7c3aed99';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('✦', 140, 180);
+  ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#a855f766';
+  ctx.fillText('POKÉMON TCG', 140, 250);
+  return new THREE.CanvasTexture(c);
+}
+
 // Cache real textures to avoid re-fetching
 const textureCache = new Map<string, THREE.Texture>();
 const loader = new THREE.TextureLoader();
@@ -61,51 +90,66 @@ function loadTexture(url: string, cb: (t: any) => void) {
   loader.load(url, (t) => { textureCache.set(url, t); cb(t); });
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────
-export function CatalogRoom() {
-  const mountRef  = useRef<HTMLDivElement>(null);
-  const sceneRef  = useRef<ReturnType<typeof buildScene> | null>(null);
-  const catalog   = useBattleStore((s) => s.catalog);
+type CardEntry = {
+  group: THREE.Group;
+  frontMesh: THREE.Mesh;
+  card: CatalogCard;
+  baseAngle: number;
+  basePosition: THREE.Vector3;
+  flipping: boolean;
+  flipProgress: number;
+};
 
-  const [searchQuery,  setSearchQuery]  = useState('');
+// ─── Component ─────────────────────────────────────────────────────────────
+export function CatalogRoom({ onGoToDeck }: { onGoToDeck?: () => void }) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<ReturnType<typeof buildScene> | null>(null);
+  const catalog = useBattleStore((s) => s.catalog);
+
+  // Uncomment the following when you implement real Add to Deck state management logic.
+  // const addToDeck = useBattleStore((s) => s.addToDeck);
+
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
-  const [hoverCard,    setHoverCard]    = useState<string | null>(null);
+  const [hoverCard, setHoverCard] = useState<string | null>(null);
   const [currentPanel, setCurrentPanel] = useState(0);
 
+  const [panelCards, setPanelCards] = useState<CatalogCard[]>([]);
+  const [panelCardIdx, setPanelCardIdx] = useState(0);
+  const [addedFeedback, setAddedFeedback] = useState(false);
+
   const cards = useMemo(() => catalog.map(wrapAsCardCatalog), [catalog]);
-
-  const numPanels = Math.ceil(cards.length / PER_PANEL);
-
-  const panelLabels = useMemo(() => {
-    const labels: string[] = [];
-    for (let i = 0; i < cards.length; i += PER_PANEL) {
-      const card = cards[i];
-      const pIdx = Math.floor(i / PER_PANEL);
-      labels.push(card.type === 'Pokémon' ? `Pokémon (P. ${pIdx + 1})` : card.type);
-    }
-    return labels;
-  }, [cards]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return q ? cards.filter(c => c.name.toLowerCase().includes(q)) : cards;
   }, [cards, searchQuery]);
 
-  // Build scene exactly ONCE for all cards
+  const panelGroups = useMemo(() => {
+    return groupByType(filtered).filter(g => g.cards.length > 0);
+  }, [filtered]);
+
+  const panelLabels = useMemo(() => panelGroups.map(g => g.type), [panelGroups]);
+
+  // Construcción de la escena con todos los paneles
   useEffect(() => {
     const mount = mountRef.current;
-    if (!mount || cards.length === 0) return;
+    if (!mount || panelGroups.length === 0) return;
 
-    const ctx = buildScene(mount, cards,
-      (card) => setSelectedCard(card),
-      (id)   => setHoverCard(id),
-      (idx)  => setCurrentPanel(idx)
+    const ctx = buildScene(mount, panelGroups,
+      (card, list, idx) => {
+        setSelectedCard(card);
+        setPanelCards(list);
+        setPanelCardIdx(idx);
+      },
+      (id) => setHoverCard(id),
+      (idx) => setCurrentPanel(idx)
     );
     sceneRef.current = ctx;
     return () => ctx.dispose();
-  }, [cards]);
+  }, [panelGroups]);
 
-  // Filter cards instantly when search query changes
+  // Filtro de cartas en la búsqueda
   useEffect(() => {
     if (sceneRef.current) {
       sceneRef.current.filterCards(searchQuery);
@@ -124,36 +168,58 @@ export function CatalogRoom() {
     setCurrentPanel(idx);
   };
 
-  const rootClass = `cr-root ${selectedCard ? 'cr-root--has-details' : ''} ${numPanels > 1 ? 'cr-root--has-pagination' : ''}`;
+  function handlePrev() {
+    if (!panelCards.length) return;
+    const idx = (panelCardIdx - 1 + panelCards.length) % panelCards.length;
+    setPanelCardIdx(idx);
+    setSelectedCard(panelCards[idx]);
+  }
+
+  function handleNext() {
+    if (!panelCards.length) return;
+    const idx = (panelCardIdx + 1) % panelCards.length;
+    setPanelCardIdx(idx);
+    setSelectedCard(panelCards[idx]);
+  }
+
+  function handleAddToDeck() {
+    if (!selectedCard) return;
+
+    // Uncomment the following when you implement real Add to Deck state management logic.
+    // addToDeck(selectedCard);
+
+    setAddedFeedback(true);
+    setTimeout(() => setAddedFeedback(false), 1800);
+  }
+
+  const rootClass = `cr-root ${selectedCard ? 'cr-root--has-details' : ''} ${panelGroups.length > 1 ? 'cr-root--has-pagination' : ''}`;
 
   return (
     <div className={rootClass}>
-      {/* 3D canvas host */}
+      {/* 3D canvas */}
       <div ref={mountRef} className="cr-canvas" />
 
-      {/* Left/Right Navigation Arrows */}
-      {numPanels > 1 && (
+      {/* Flechas de navegación izquierda/derecha */}
+      {panelGroups.length > 1 && (
         <>
-          <button 
+          <button
             className="cr-nav-arrow cr-nav-arrow--left"
-            onClick={() => handleGoToPanel(currentPanel - 1)}
-            disabled={currentPanel === 0}
-            aria-label="Página anterior"
+            onClick={() => handleGoToPanel((currentPanel - 1 + panelGroups.length) % panelGroups.length)}
+            aria-label="Panel anterior"
           >
             &#10094;
           </button>
-          <button 
+          <button
             className="cr-nav-arrow cr-nav-arrow--right"
-            onClick={() => handleGoToPanel(currentPanel + 1)}
-            disabled={currentPanel === numPanels - 1}
-            aria-label="Página siguiente"
+            onClick={() => handleGoToPanel((currentPanel + 1) % panelGroups.length)}
+            aria-label="Panel siguiente"
           >
             &#10095;
           </button>
         </>
       )}
 
-      {/* Search overlay */}
+      {/* Barra de búsqueda */}
       <div className="cr-search-bar">
         <span className="cr-search-bar__icon">🔍</span>
         <input
@@ -171,19 +237,20 @@ export function CatalogRoom() {
         )}
       </div>
 
-      {/* Card count badge */}
+      {/* Contenedor de información de cartas */}
       <div className="cr-badge">
         {filtered.length} carta{filtered.length !== 1 ? 's' : ''}
       </div>
 
-      {/* Pagination Bottom Bar */}
-      {numPanels > 1 && (
+      {/* Barra de paginación inferior */}
+      {panelGroups.length > 1 && (
         <div className="cr-pagination">
           {panelLabels.map((label, idx) => (
             <button
               key={idx}
               className={`cr-pagination-pill ${currentPanel === idx ? 'cr-pagination-pill--active' : ''}`}
               onClick={() => handleGoToPanel(idx)}
+              style={{ borderLeftColor: TYPE_COLORS[label] || TYPE_COLORS['Colorless'], borderLeftWidth: currentPanel === idx ? 0 : 4, borderLeftStyle: currentPanel === idx ? 'none' : 'solid' }}
             >
               {label}
             </button>
@@ -191,10 +258,10 @@ export function CatalogRoom() {
         </div>
       )}
 
-      {/* Navigation hint */}
+      {/* Indicador de navegación */}
       <div className="cr-hint">Arrastra para girar · Scroll para acercar · Click para detalles</div>
 
-      {/* Details panel */}
+      {/* Panel de detalles */}
       {selectedCard && (
         <aside className="cr-details" role="complementary" aria-label="Detalles de la carta">
           <button className="cr-details__close"
@@ -218,15 +285,49 @@ export function CatalogRoom() {
 
             {selectedCard.attackName && (
               <div className="cr-details__attack">
-                <span className="cr-details__attack-name">{selectedCard.attackName}</span>
-                <span className="cr-details__attack-dmg">
-                  {selectedCard.attackDamage ? `${selectedCard.attackDamage} dmg` : ''}
-                </span>
+                <div className="cr-details__attack-header">
+                  <span className="cr-details__attack-name">{selectedCard.attackName}</span>
+                  <span className="cr-details__attack-dmg">
+                    {selectedCard.attackDamage ? `${selectedCard.attackDamage} dmg` : ''}
+                  </span>
+                </div>
                 {selectedCard.attackCost ? (
                   <span className="cr-details__attack-cost">Costo {selectedCard.attackCost}</span>
                 ) : null}
+                {(selectedCard as any).attack1Effect && (
+                  <p className="cr-details__description">
+                    {(selectedCard as any).attack1Effect}
+                  </p>
+                )}
               </div>
             )}
+
+            <div className="cr-details__actions-container">
+              {panelCards.length > 1 && (
+                <div className="cr-details__nav" aria-label="Navegar entre cartas">
+                  <button className="cr-details__nav-btn" onClick={handlePrev} aria-label="Carta anterior">◀</button>
+                  <span className="cr-details__nav-counter">{panelCardIdx + 1} / {panelCards.length}</span>
+                  <button className="cr-details__nav-btn" onClick={handleNext} aria-label="Carta siguiente">▶</button>
+                </div>
+              )}
+
+              <div className="cr-details__actions">
+                <button
+                  className={`cr-details__add${addedFeedback ? ' cr-details__add--done' : ''}`}
+                  onClick={handleAddToDeck}
+                  aria-label="Agregar carta al mazo"
+                >
+                  {addedFeedback ? '✓ Agregada' : '+ Agregar al Mazo'}
+                </button>
+                <button
+                  className="cr-details__goTo"
+                  onClick={() => onGoToDeck?.()}
+                  aria-label="Ir al Mazo"
+                >
+                  🗂 Ir al Mazo
+                </button>
+              </div>
+            </div>
           </div>
         </aside>
       )}
@@ -242,12 +343,19 @@ export function CatalogRoom() {
 // ─── Three.js scene builder ────────────────────────────────────────────────
 function buildScene(
   mount: HTMLDivElement,
-  cards: CatalogCard[],
-  onSelect: (c: CatalogCard) => void,
-  onHover:  (name: string | null) => void,
+  panelGroups: Array<{ type: string; cards: CatalogCard[] }>,
+  onSelect: (c: CatalogCard, list: CatalogCard[], idx: number) => void,
+  onHover: (name: string | null) => void,
   onPanelChange: (idx: number) => void,
 ) {
-  const placeholder = makePlaceholderTexture();
+  const placeholderTex = makePlaceholderTexture();
+  const backTex = makeBackTexture();
+  const cardFrontGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+  const cardBackGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+
+  const NUM_PANELS = panelGroups.length;
+  // Calculo dinámico del radio en base al número de paneles
+  const ARC_RADIUS = Math.max(15, (NUM_PANELS * 14) / (2 * Math.PI));
 
   // --- Renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -259,10 +367,10 @@ function buildScene(
 
   // --- Scene
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x040c18, 18, 40);
+  scene.fog = new THREE.Fog(0x040c18, ARC_RADIUS * 0.8, ARC_RADIUS * 2.5);
 
   // --- Camera
-  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 80);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, ARC_RADIUS * 3);
   camera.position.set(0, 2, 0);
 
   // --- Controls
@@ -271,7 +379,7 @@ function buildScene(
   controls.dampingFactor = 0.06;
   controls.enablePan = false;
   controls.minDistance = 2;
-  controls.maxDistance = 18;
+  controls.maxDistance = ARC_RADIUS - 1; // Previene no atravesar los paneles
   controls.minPolarAngle = Math.PI * 0.28;
   controls.maxPolarAngle = Math.PI * 0.72;
   controls.target.set(0, 1.5, 0);
@@ -287,14 +395,14 @@ function buildScene(
   rimLight.position.set(0, 8, 8); scene.add(rimLight);
 
   // --- Floor grid
-  const grid = new THREE.GridHelper(50, 50, 0x1e40af, 0x0f2d5a);
+  const grid = new THREE.GridHelper(ARC_RADIUS * 3, Math.floor(ARC_RADIUS * 3), 0x1e40af, 0x0f2d5a);
   (grid.material as THREE.Material).transparent = true;
   (grid.material as THREE.Material).opacity = 0.35;
   grid.position.y = -1.5;
   scene.add(grid);
 
-  const floorGeo  = new THREE.CircleGeometry(24, 64);
-  const floorMat  = new THREE.MeshStandardMaterial({
+  const floorGeo = new THREE.CircleGeometry(ARC_RADIUS * 1.5, 64);
+  const floorMat = new THREE.MeshStandardMaterial({
     color: 0x030810, roughness: 0.9, metalness: 0.2,
     transparent: true, opacity: 0.85,
   });
@@ -305,7 +413,7 @@ function buildScene(
 
   // Ambient halo ring on floor
   const halo = new THREE.Mesh(
-    new THREE.RingGeometry(5, 7, 96),
+    new THREE.RingGeometry(ARC_RADIUS * 0.3, ARC_RADIUS * 0.5, 96),
     new THREE.MeshBasicMaterial({ color: 0x1e40af, transparent: true, opacity: 0.12, side: THREE.DoubleSide }),
   );
   halo.rotation.x = -Math.PI / 2; halo.position.y = -1.49;
@@ -315,9 +423,9 @@ function buildScene(
   const pCount = 300;
   const pPos = new Float32Array(pCount * 3);
   for (let i = 0; i < pCount; i++) {
-    pPos[i*3]   = (Math.random() - 0.5) * 40;
-    pPos[i*3+1] = Math.random() * 14;
-    pPos[i*3+2] = (Math.random() - 0.5) * 40;
+    pPos[i * 3] = (Math.random() - 0.5) * (ARC_RADIUS * 2.5);
+    pPos[i * 3 + 1] = Math.random() * 14;
+    pPos[i * 3 + 2] = (Math.random() - 0.5) * (ARC_RADIUS * 2.5);
   }
   const pGeo = new THREE.BufferGeometry();
   pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
@@ -325,179 +433,249 @@ function buildScene(
     new THREE.PointsMaterial({ color: 0x93c5fd, size: 0.045, transparent: true, opacity: 0.6 }));
   scene.add(particles);
 
-  // --- Card meshes
-  const cardGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
-  const cardMeshes: Array<{ mesh: THREE.Mesh; card: CatalogCard; baseColor: THREE.Color }> = [];
-  const numPanels = Math.ceil(cards.length / PER_PANEL);
+  // --- Construcción de paneles
+  const allEntries: CardEntry[] = [];
+  const panelPivots: THREE.Group[] = [];
+  const cardPanelMap = new Map<string, { list: CatalogCard[]; idx: number }>();
 
-  cards.forEach((card, i) => {
-    const panelIdx = Math.floor(i / PER_PANEL);
-    const slotIdx  = i % PER_PANEL;
-    const col      = slotIdx % COLS;
-    const row      = Math.floor(slotIdx / COLS);
-
-    // Angle of this panel in the arc
-    const t     = numPanels === 1 ? 0.5 : panelIdx / (numPanels - 1);
-    const angle = -ARC_SPAN / 2 + t * ARC_SPAN;  // centered at 0 (facing user)
-
-    // Panel centre on the arc
-    const px = Math.sin(angle) * ARC_RADIUS;
-    const pz = -Math.cos(angle) * ARC_RADIUS;
-
-    // Slot offset within the panel
-    const localX = (col - (COLS - 1) / 2) * (CARD_W + GAP_X);
-    const localY = (row - (ROWS - 1) / 2) * (CARD_H + GAP_Y) + 2.0;
-
-    // Rotate slot into panel orientation (tangent to arc)
-    const cos = Math.cos(angle); const sin = Math.sin(angle);
-    const wx  = px + localX * cos;
-    const wz  = pz - localX * sin;
-
-    const mat = new THREE.MeshStandardMaterial({
-      map: placeholder,
-      roughness: 0.25, metalness: 0.1,
-      transparent: true, opacity: 1,
+  function disposePivot(pivotGroup: THREE.Group) {
+    pivotGroup.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      if (obj.geometry !== cardFrontGeo && obj.geometry !== cardBackGeo) {
+        obj.geometry.dispose();
+      }
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const mat of mats as THREE.Material[]) {
+        if ((mat as any).map && (mat as any).map !== placeholderTex && (mat as any).map !== backTex) {
+          (mat as any).map.dispose();
+        }
+        mat.dispose();
+      }
     });
+  }
 
-    const mesh = new THREE.Mesh(cardGeo, mat);
-    mesh.position.set(wx, localY, wz);
-    mesh.rotation.y = angle; // face inward (toward origin)
-    mesh.userData = { cardId: card.id };
-    scene.add(mesh);
-
-    const base = typeColor(card);
-    cardMeshes.push({ mesh, card, baseColor: base.clone() });
-
-    // Glow border
-    const borderGeo = new THREE.PlaneGeometry(CARD_W + 0.07, CARD_H + 0.07);
-    const borderMat = new THREE.MeshBasicMaterial({
-      color: base, transparent: true, opacity: 0.0, side: THREE.DoubleSide,
-    });
-    const border = new THREE.Mesh(borderGeo, borderMat);
-    border.position.set(wx, localY, wz);
-    border.rotation.y = angle;
-    border.position.x += Math.sin(angle) * -0.01;
-    border.position.z += -Math.cos(angle) * -0.01;
-    border.userData = { isBorder: true };
-    scene.add(border);
-    mesh.userData.border = border;
-
-    // Load real texture lazily on hover
-    mesh.userData.loadTexture = () => {
-      const url = card.imageSmall;
-      if (!url) return;
-      loadTexture(url, (t) => { mat.map = t; mat.needsUpdate = true; });
-    };
-
-    // Category label above first card of each panel
-    if (slotIdx === 0) {
-      const panelW  = COLS * (CARD_W + GAP_X);
-      const labelGeo   = new THREE.PlaneGeometry(panelW * 0.6, 0.55);
-      const labelCanvas = document.createElement('canvas');
-      labelCanvas.width  = 256; labelCanvas.height = 64;
-      const lctx = labelCanvas.getContext('2d')!;
-      lctx.fillStyle = '#00000088';
-      lctx.roundRect(4, 4, 248, 56, 10);
-      lctx.fill();
-      lctx.font = 'bold 28px sans-serif';
-      lctx.fillStyle = '#7dd3fc';
-      lctx.textAlign = 'center'; lctx.textBaseline = 'middle';
-      const label = card.type === 'Pokémon' ? `Pokémon · Parte ${panelIdx + 1}` : card.type;
-      lctx.fillText(label, 128, 32);
-      const labelTex = new THREE.CanvasTexture(labelCanvas);
-      const labelMat = new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, side: THREE.DoubleSide });
-      const labelMesh = new THREE.Mesh(labelGeo, labelMat);
-      const topY = localY + (ROWS / 2) * (CARD_H + GAP_Y) + 0.5;
-      labelMesh.position.set(px, topY, pz);
-      labelMesh.rotation.y = angle;
-      scene.add(labelMesh);
+  // Flip de cartas en 360° al seleccionar la carta en el panel
+  function startFlip(entry: CardEntry) {
+    if (entry.flipping) return;
+    entry.flipping = true;
+    entry.flipProgress = 0;
+    const url = entry.card.imageLarge || entry.card.imageSmall;
+    if (url) {
+      loadTexture(url, (t) => {
+        (entry.frontMesh.material as THREE.MeshStandardMaterial).map = t;
+        (entry.frontMesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
+      });
     }
+  }
+
+  function resetFlip(entry: CardEntry) {
+    entry.flipping = false;
+    entry.flipProgress = 0;
+    entry.group.rotation.y = entry.baseAngle;
+    entry.group.scale.set(1, 1, 1);
+    entry.group.position.copy(entry.basePosition);
+  }
+
+  panelGroups.forEach((panelGroup, i) => {
+    const angle = (i / NUM_PANELS) * Math.PI * 2;
+    const pivot = new THREE.Group();
+    pivot.rotation.y = angle;
+
+    const panelWidth = COLS * (CARD_W + GAP_X) - GAP_X;
+    const panelHeight = ROWS * (CARD_H + GAP_Y) - GAP_Y;
+
+    // Ajustar la altura del panel para evitar que colisione con el suelo
+    const FLOOR_Y = -1.5;
+    const FLOOR_CLEARANCE = 1.0; // Distancia desde el suelo
+    const panelCenterY = FLOOR_Y + FLOOR_CLEARANCE + panelHeight / 2;
+
+    // Backing
+    const backingGeo = new THREE.PlaneGeometry(panelWidth + 0.6, panelHeight + 0.8);
+    const backingMat = new THREE.MeshBasicMaterial({
+      color: 0x0a1628, transparent: true, opacity: 0.6, side: THREE.FrontSide,
+    });
+    const backing = new THREE.Mesh(backingGeo, backingMat);
+    backing.position.set(0, panelCenterY, -ARC_RADIUS - 0.03);
+    pivot.add(backing);
+
+    // Border
+    const typeHex = TYPE_COLORS[panelGroup.type] ?? TYPE_COLORS['Colorless'];
+    const borderGeo = new THREE.PlaneGeometry(panelWidth + 0.7, panelHeight + 0.9);
+    const borderMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(typeHex), transparent: true, opacity: 0.12, side: THREE.BackSide,
+    });
+    const borderMesh = new THREE.Mesh(borderGeo, borderMat);
+    borderMesh.position.set(0, panelCenterY, -ARC_RADIUS - 0.04);
+    pivot.add(borderMesh);
+
+    // Label
+    const labelCanvas = document.createElement('canvas');
+    labelCanvas.width = 256; labelCanvas.height = 64;
+    const lctx = labelCanvas.getContext('2d')!;
+    lctx.fillStyle = '#000000aa';
+    lctx.roundRect(4, 4, 248, 56, 12);
+    lctx.fill();
+    lctx.font = 'bold 26px sans-serif';
+    lctx.fillStyle = typeHex;
+    lctx.textAlign = 'center'; lctx.textBaseline = 'middle';
+    lctx.fillText(panelGroup.type, 128, 32);
+    const labelTex = new THREE.CanvasTexture(labelCanvas);
+    const labelMat = new THREE.MeshBasicMaterial({ map: labelTex, transparent: true });
+    const labelGeo = new THREE.PlaneGeometry(panelWidth * 0.5, 0.5);
+    const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+    const panelTopY = panelCenterY + panelHeight / 2;
+    labelMesh.position.set(0, panelTopY + CARD_H / 2 + 0.35, -ARC_RADIUS);
+    pivot.add(labelMesh);
+
+    const panelCardList = panelGroup.cards.slice(0, PER_PANEL);
+
+    panelCardList.forEach((card, slotIdx) => {
+      cardPanelMap.set(card.id, { list: panelCardList, idx: slotIdx });
+
+      const col = slotIdx % COLS;
+      const row = Math.floor(slotIdx / COLS);
+
+      // Invertir el orden de las filas para que row=0 empiece arriba
+      const rowFromTop = (ROWS - 1) - row;
+
+      const localX = (col - (COLS - 1) / 2) * (CARD_W + GAP_X);
+      const localY = FLOOR_Y + FLOOR_CLEARANCE + CARD_H / 2 + rowFromTop * (CARD_H + GAP_Y);
+
+      const cardGroup = new THREE.Group();
+      cardGroup.position.set(localX, localY, -ARC_RADIUS);
+
+      const frontMat = new THREE.MeshStandardMaterial({
+        map: placeholderTex, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 1
+      });
+      const frontMesh = new THREE.Mesh(cardFrontGeo, frontMat);
+      frontMesh.userData = { isCard: true, cardId: card.id };
+      cardGroup.add(frontMesh);
+
+      const backMat = new THREE.MeshStandardMaterial({
+        map: backTex, roughness: 0.4, metalness: 0.1
+      });
+      const backMesh = new THREE.Mesh(cardBackGeo, backMat);
+      backMesh.rotation.y = Math.PI;
+      cardGroup.add(backMesh);
+
+      pivot.add(cardGroup);
+
+      const basePos = cardGroup.position.clone();
+      const entry: CardEntry = {
+        group: cardGroup, frontMesh, card,
+        baseAngle: 0, basePosition: basePos,
+        flipping: false, flipProgress: 0
+      };
+      allEntries.push(entry);
+
+      frontMesh.userData.entry = entry;
+
+      // Glow border for hover
+      const hoverBorderGeo = new THREE.PlaneGeometry(CARD_W + 0.07, CARD_H + 0.07);
+      const hoverBorderMat = new THREE.MeshBasicMaterial({
+        color: typeColor(card.type), transparent: true, opacity: 0.0, side: THREE.DoubleSide,
+      });
+      const hoverBorder = new THREE.Mesh(hoverBorderGeo, hoverBorderMat);
+      hoverBorder.position.z = -0.01;
+      hoverBorder.userData = { isBorder: true };
+      cardGroup.add(hoverBorder);
+      frontMesh.userData.border = hoverBorder;
+
+      frontMesh.userData.loadTexture = () => {
+        const url = card.imageSmall;
+        if (!url) return;
+        loadTexture(url, (t) => { frontMat.map = t; frontMat.needsUpdate = true; });
+      };
+    });
+
+    scene.add(pivot);
+    panelPivots.push(pivot);
   });
 
   // --- Raycasting
   const raycaster = new THREE.Raycaster();
-  const mouse     = new THREE.Vector2();
-  let   hoveredMesh: THREE.Mesh | null = null;
-  let   selectedMesh: THREE.Mesh | null = null;
+  const mouse = new THREE.Vector2();
+  let hoveredEntry: CardEntry | null = null;
+  let selectedEntry: CardEntry | null = null;
 
-  function getCardMeshes() { return cardMeshes.map(c => c.mesh); }
+  function getRaycastTargets() { return allEntries.map(e => e.frontMesh); }
 
-  function setBorderOpacity(mesh: THREE.Mesh, opacity: number) {
-    const border = mesh.userData.border as THREE.Mesh | undefined;
+  function setBorderOpacity(entry: CardEntry, opacity: number) {
+    const border = entry.frontMesh.userData.border as THREE.Mesh | undefined;
     if (border) {
       (border.material as THREE.MeshBasicMaterial).opacity = opacity;
     }
   }
 
-  function setHoverState(mesh: THREE.Mesh | null) {
-    if (mesh === hoveredMesh) return;
+  function setHoverState(entry: CardEntry | null) {
+    if (entry === hoveredEntry) return;
 
-    if (hoveredMesh) {
-      const entry = cardMeshes.find(c => c.mesh === hoveredMesh);
-      if (entry && hoveredMesh !== selectedMesh) {
-        hoveredMesh.scale.set(1, 1, 1);
-        setBorderOpacity(hoveredMesh, 0);
+    if (hoveredEntry) {
+      if (hoveredEntry !== selectedEntry && !hoveredEntry.flipping) {
+        hoveredEntry.group.scale.set(1, 1, 1);
+        setBorderOpacity(hoveredEntry, 0);
       }
       onHover(null);
     }
 
-    hoveredMesh = mesh;
-    if (mesh) {
-      mesh.scale.set(1.06, 1.06, 1.06);
-      setBorderOpacity(mesh, 0.7);
-      const entry = cardMeshes.find(c => c.mesh === mesh);
-      if (entry) { onHover(entry.card.name); mesh.userData.loadTexture?.(); }
+    hoveredEntry = entry;
+    if (entry && !entry.flipping) {
+      entry.group.scale.set(1.06, 1.06, 1.06);
+      setBorderOpacity(entry, 0.7);
+      onHover(entry.card.name);
+      entry.frontMesh.userData.loadTexture?.();
     }
   }
 
   function onMouseMove(e: MouseEvent) {
     const rect = mount.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
-    mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
-    const hits = raycaster.intersectObjects(getCardMeshes());
-    setHoverState(hits.length ? (hits[0].object as THREE.Mesh) : null);
-    mount.style.cursor = hits.length ? 'pointer' : 'grab';
+    const hits = raycaster.intersectObjects(getRaycastTargets());
+    if (hits.length) {
+      const mesh = hits[0].object as THREE.Mesh;
+      setHoverState(mesh.userData.entry);
+      mount.style.cursor = 'pointer';
+    } else {
+      setHoverState(null);
+      mount.style.cursor = 'grab';
+    }
   }
 
   function onMouseClick(e: MouseEvent) {
     if (e.button !== 0) return;
     const rect = mount.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
-    mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
-    const hits = raycaster.intersectObjects(getCardMeshes());
+    const hits = raycaster.intersectObjects(getRaycastTargets());
     if (hits.length) {
-      const mesh  = hits[0].object as THREE.Mesh;
-      const entry = cardMeshes.find(c => c.mesh === mesh);
-      if (entry) {
-        // Deselect old
-        if (selectedMesh && selectedMesh !== mesh) {
-          selectedMesh.scale.set(1, 1, 1);
-          setBorderOpacity(selectedMesh, 0);
-        }
-        selectedMesh = mesh;
-        mesh.scale.set(1.12, 1.12, 1.12);
-        // Load hi-res texture
-        const url = entry.card.imageLarge || entry.card.imageSmall;
-        if (url) loadTexture(url, (t) => {
-          (mesh.material as THREE.MeshStandardMaterial).map = t;
-          (mesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
-        });
-        onSelect(entry.card);
+      const mesh = hits[0].object as THREE.Mesh;
+      const entry = mesh.userData.entry as CardEntry;
+
+      if (selectedEntry && selectedEntry !== entry) {
+        resetFlip(selectedEntry);
+        setBorderOpacity(selectedEntry, 0);
       }
+      selectedEntry = entry;
+      entry.group.scale.set(1.12, 1.12, 1.12);
+      startFlip(entry);
+
+      const panelInfo = cardPanelMap.get(entry.card.id);
+      onSelect(entry.card, panelInfo?.list ?? [entry.card], panelInfo?.idx ?? 0);
     } else {
-      if (selectedMesh) {
-        selectedMesh.scale.set(1, 1, 1);
-        setBorderOpacity(selectedMesh, 0);
-        selectedMesh = null;
+      if (selectedEntry) {
+        resetFlip(selectedEntry);
+        setBorderOpacity(selectedEntry, 0);
+        selectedEntry = null;
       }
-      onSelect(null as unknown as CatalogCard);
+      onSelect(null as unknown as CatalogCard, [], 0);
     }
   }
 
   mount.addEventListener('mousemove', onMouseMove);
-  mount.addEventListener('click',     onMouseClick);
+  mount.addEventListener('click', onMouseClick);
 
   // --- Auto Navigation Animation
   let isAnimating = false;
@@ -523,10 +701,26 @@ function buildScene(
 
   // --- Animate
   const clock = new THREE.Clock();
+  const FLIP_SPEED = 2.5;
+
   function animate() {
     const loop = () => {
       raf = requestAnimationFrame(loop);
+      const dt = clock.getDelta();
       const t = clock.getElapsedTime();
+
+      // Flips
+      for (const entry of allEntries) {
+        if (!entry.flipping) continue;
+        entry.flipProgress = Math.min(1, entry.flipProgress + FLIP_SPEED * dt);
+        const p = entry.flipProgress;
+        const eased = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+        entry.group.rotation.y = entry.baseAngle + eased * Math.PI * 2;
+        if (entry.flipProgress >= 1) {
+          entry.flipping = false;
+          entry.group.rotation.y = entry.baseAngle;
+        }
+      }
 
       // Handle camera auto-navigation interpolation
       if (isAnimating) {
@@ -535,18 +729,18 @@ function buildScene(
 
         let thetaDiff = animTargetTheta - spherical.theta;
         thetaDiff = Math.atan2(Math.sin(thetaDiff), Math.cos(thetaDiff)); // normalize to [-PI, PI]
-        
+
         spherical.theta += thetaDiff * 0.08;
         spherical.phi += (animTargetPhi - spherical.phi) * 0.08;
         spherical.radius += (animTargetRadius - spherical.radius) * 0.08;
-        
+
         offset.setFromSpherical(spherical);
         camera.position.copy(controls.target).add(offset);
         camera.lookAt(controls.target);
 
         if (Math.abs(thetaDiff) < 0.001 &&
-            Math.abs(animTargetPhi - spherical.phi) < 0.001 &&
-            Math.abs(animTargetRadius - spherical.radius) < 0.001) {
+          Math.abs(animTargetPhi - spherical.phi) < 0.001 &&
+          Math.abs(animTargetRadius - spherical.radius) < 0.001) {
           isAnimating = false;
         }
       }
@@ -557,17 +751,22 @@ function buildScene(
       const currentSpherical = new THREE.Spherical().setFromVector3(
         new THREE.Vector3().copy(camera.position).sub(controls.target)
       );
+
       let closestIdx = 0;
       let minDiff = Infinity;
-      for (let idx = 0; idx < numPanels; idx++) {
-        const pt = numPanels === 1 ? 0.5 : idx / (numPanels - 1);
-        const angle = -ARC_SPAN / 2 + pt * ARC_SPAN;
-        let diff = Math.abs(Math.atan2(Math.sin(angle - (-currentSpherical.theta)), Math.cos(angle - (-currentSpherical.theta))));
+
+      for (let idx = 0; idx < NUM_PANELS; idx++) {
+        const panelAngle = (idx / NUM_PANELS) * Math.PI * 2;
+        const camAngle = -currentSpherical.theta;
+        const diff = Math.abs(
+          Math.atan2(Math.sin(camAngle - panelAngle), Math.cos(camAngle - panelAngle))
+        );
         if (diff < minDiff) {
           minDiff = diff;
           closestIdx = idx;
         }
       }
+
       if (closestIdx !== lastReportedPanelIdx) {
         lastReportedPanelIdx = closestIdx;
         onPanelChange(closestIdx);
@@ -575,8 +774,8 @@ function buildScene(
 
       particles.rotation.y = t * 0.018;
       (halo.material as THREE.MeshBasicMaterial).opacity = 0.10 + Math.sin(t * 1.1) * 0.03;
-      blueKey.position.x   = Math.sin(t * 0.4) * 8;
-      purpleKey.position.x = Math.cos(t * 0.3) * 8;
+      blueKey.position.x = Math.sin(t * 0.4) * (ARC_RADIUS * 0.5);
+      purpleKey.position.x = Math.cos(t * 0.3) * (ARC_RADIUS * 0.5);
       renderer.render(scene, camera);
     };
     loop();
@@ -585,7 +784,7 @@ function buildScene(
 
   // --- Progressive Texture Loader
   let isDisposed = false;
-  
+
   const loadTextureAsync = (url: string) => new Promise<THREE.Texture | null>((resolve) => {
     if (textureCache.has(url)) {
       resolve(textureCache.get(url)!);
@@ -600,32 +799,29 @@ function buildScene(
   });
 
   const progressiveLoad = async () => {
-    // Wait a brief moment to prioritize initial scene render and user interaction
     await new Promise(r => setTimeout(r, 1000));
-    
-    const toLoad = [...cardMeshes];
+
+    const toLoad = [...allEntries];
     const chunkSize = 4;
-    
+
     for (let i = 0; i < toLoad.length; i += chunkSize) {
       if (isDisposed) break;
       const chunk = toLoad.slice(i, i + chunkSize);
-      
+
       await Promise.all(chunk.map(async (entry) => {
         const url = entry.card.imageSmall;
         if (!url) return;
-        
-        const mat = entry.mesh.material as THREE.MeshStandardMaterial;
-        // If already loaded by hover (not using placeholder anymore), skip
-        if (mat.map !== placeholder) return;
-        
+
+        const mat = entry.frontMesh.material as THREE.MeshStandardMaterial;
+        if (mat.map !== placeholderTex) return;
+
         const tex = await loadTextureAsync(url);
-        if (tex && !isDisposed && mat.map === placeholder) {
+        if (tex && !isDisposed && mat.map === placeholderTex) {
           mat.map = tex;
           mat.needsUpdate = true;
         }
       }));
-      
-      // Yield to main thread / network
+
       await new Promise(r => setTimeout(r, 100));
     }
   };
@@ -635,33 +831,33 @@ function buildScene(
   return {
     resize,
     goToPanel: (panelIdx: number) => {
-      const pt = numPanels === 1 ? 0.5 : panelIdx / (numPanels - 1);
-      const panelAngle = -ARC_SPAN / 2 + pt * ARC_SPAN;
-      animTargetTheta = -panelAngle;
+      const angle = (panelIdx / NUM_PANELS) * Math.PI * 2;
+      animTargetTheta = -angle;
       animTargetPhi = Math.PI * 0.46;
-      animTargetRadius = 11;
+      animTargetRadius = ARC_RADIUS - 3;
       isAnimating = true;
     },
     filterCards: (query: string) => {
       const q = query.trim().toLowerCase();
-      cardMeshes.forEach(({ mesh, card }) => {
-        const matches = !q || card.name.toLowerCase().includes(q);
-        mesh.visible = matches;
-        const border = mesh.userData.border as THREE.Mesh | undefined;
-        if (border) {
-          border.visible = matches;
-        }
+      allEntries.forEach((entry) => {
+        const matches = !q || entry.card.name.toLowerCase().includes(q);
+        entry.group.visible = matches;
       });
     },
     dispose() {
       isDisposed = true;
       cancelAnimationFrame(raf);
       mount.removeEventListener('mousemove', onMouseMove);
-      mount.removeEventListener('click',     onMouseClick);
+      mount.removeEventListener('click', onMouseClick);
       controls.dispose();
       pGeo.dispose();
-      cardGeo.dispose();
-      placeholder.dispose();
+      cardFrontGeo.dispose();
+      cardBackGeo.dispose();
+      placeholderTex.dispose();
+      backTex.dispose();
+
+      panelPivots.forEach(disposePivot);
+
       renderer.dispose();
       mount.querySelector('canvas')?.remove();
     },
