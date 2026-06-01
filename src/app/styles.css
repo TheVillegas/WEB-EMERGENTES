@@ -914,3 +914,8 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
 .diff-card__indicator {
   font-size: 20px;
 }
+
+button.is-keyboard-focused {
+  box-shadow: 0 0 0 2px var(--cyan), 0 0 12px rgba(76, 215, 255, 0.4);
+  border-color: var(--cyan);
+}

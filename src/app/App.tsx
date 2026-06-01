@@ -178,6 +178,9 @@ export function App() {
   const [view, setView] = useState<AppView>('menu');
   const [previousView, setPreviousView] = useState<AppView>('menu');
   const [showResult, setShowResult] = useState(false);
+  const [focusedArea, setFocusedArea] = useState<'hand' | 'actions'>('hand');
+  const [focusedHandIndex, setFocusedHandIndex] = useState(0);
+  const [focusedActionIndex, setFocusedActionIndex] = useState(0);
   const {
     catalogStatus,
     errorMessage,
@@ -261,6 +264,53 @@ export function App() {
 
   const playerCanPass =
     match?.phase === 'player-turn' && match.turn === 'player' && !match.pendingNpc && !match.winner;
+
+  useEffect(() => {
+    if (view !== 'battle' || !match || showResult || catalogStatus !== 'ready') return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp') {
+        if (focusedArea === 'hand' && match.playerActive) {
+          setFocusedArea('actions');
+          e.preventDefault();
+        }
+      } else if (e.key === 'ArrowDown') {
+        if (focusedArea === 'actions') {
+          setFocusedArea('hand');
+          e.preventDefault();
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (focusedArea === 'hand') {
+          setFocusedHandIndex((prev) => Math.max(0, prev - 1));
+        } else if (focusedArea === 'actions') {
+          setFocusedActionIndex((prev) => Math.max(0, prev - 1));
+        }
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
+        if (focusedArea === 'hand') {
+          setFocusedHandIndex((prev) => Math.min(match.playerHand.length - 1, prev + 1));
+        } else if (focusedArea === 'actions') {
+          setFocusedActionIndex((prev) => Math.min(2, prev + 1)); // 0: energy, 1: attack, 2: pass
+        }
+        e.preventDefault();
+      } else if (e.key === 'Enter') {
+        if (focusedArea === 'hand') {
+          if (match.phase === 'selecting-active' && match.playerHand[focusedHandIndex]) {
+            handleSelectPlayerActive(match.playerHand[focusedHandIndex].id);
+          }
+        } else if (focusedArea === 'actions') {
+          if (focusedActionIndex === 0 && playerCanAssignEnergy) assignPlayerEnergy();
+          else if (focusedActionIndex === 1 && playerCanAttack) playerAttack();
+          else if (focusedActionIndex === 2 && playerCanPass) passPlayerTurn();
+        }
+        e.preventDefault();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [view, match, showResult, catalogStatus, focusedArea, focusedHandIndex, focusedActionIndex, playerCanAssignEnergy, playerCanAttack, playerCanPass]);
+
 
   const logEntries = useMemo(() => (match ? match.log.map(formatLogEntry).slice(-6).reverse() : []), [match]);
   const summary = useMemo(() => (match ? getMatchSummary(match) : null), [match]);
@@ -496,7 +546,7 @@ export function App() {
 
       {/* Battle arena — mounted only when view is battle to save GPU */}
       <div style={{ display: view === 'battle' ? 'contents' : 'none' }}>
-        {view === 'battle' && <ThreeArena />}
+        {view === 'battle' && <ThreeArena match={match} focusedArea={focusedArea} focusedHandIndex={focusedHandIndex} focusedActionIndex={focusedActionIndex} onSelectPlayerActive={handleSelectPlayerActive} />}
 
         {catalogStatus === 'loading' ? <section className="system-overlay"><h2>Preparando la arena...</h2></section> : null}
         {catalogStatus === 'error' ? <section className="system-overlay"><h2>No se pudo levantar la demo</h2><p>{errorMessage}</p></section> : null}
@@ -543,7 +593,7 @@ export function App() {
                 <div className="opponent-discard-slot"><ZonePile label="Discard" /></div>
                 <div className="opponent-bench-row"><BenchSlots owner="npc" /></div>
                 <div className="opponent-active-slot" ref={npcActiveRef}>
-                  {match.npcActive ? <ActiveCard battler={match.npcActive} owner="npc" status={match.pendingNpc ? 'NPC preparando respuesta' : 'Carta activa rival'} /> : <div className="empty-slot">Esperando rival</div>}
+                  {/* NPC Active Card is now in 3D */}
                 </div>
 
                 <div className="combat-lane">
@@ -557,14 +607,14 @@ export function App() {
                 <div className="player-bench-row"><BenchSlots owner="player" /></div>
                 <div className="player-active-slot" ref={playerSlotRef}>
                   <div className="active-wrapper" ref={playerActiveRef}>
-                    {match.playerActive ? <ActiveCard battler={match.playerActive} owner="player" status={match.phase === 'selecting-active' ? 'Seleccioná tu activo' : 'Tu carta activa'} /> : <div className="empty-slot empty-slot--player">Sin Pokémon activo</div>}
+                    {/* Player Active Card is now in 3D */}
                   </div>
                 </div>
 
                 <div className="action-bar">
-                  <button type="button" className="primary-action" onClick={() => assignPlayerEnergy()} disabled={!playerCanAssignEnergy}>Asignar energía</button>
-                  <button type="button" className="primary-action accent-action" onClick={() => void playerAttack()} disabled={!playerCanAttack}>Atacar</button>
-                  <button type="button" className="secondary-action" onClick={() => void passPlayerTurn()} disabled={!playerCanPass}>Pasar turno</button>
+                  <button type="button" className={`primary-action ${focusedArea === 'actions' && focusedActionIndex === 0 ? 'is-keyboard-focused' : ''}`} onClick={() => assignPlayerEnergy()} disabled={!playerCanAssignEnergy}>Asignar energía</button>
+                  <button type="button" className={`primary-action accent-action ${focusedArea === 'actions' && focusedActionIndex === 1 ? 'is-keyboard-focused' : ''}`} onClick={() => void playerAttack()} disabled={!playerCanAttack}>Atacar</button>
+                  <button type="button" className={`secondary-action ${focusedArea === 'actions' && focusedActionIndex === 2 ? 'is-keyboard-focused' : ''}`} onClick={() => void passPlayerTurn()} disabled={!playerCanPass}>Pasar turno</button>
                 </div>
 
                 {match.playerActive ? <div className="energy-sidecar"><span className="eyebrow">Energía</span><strong>{match.playerActive.energy}/{match.playerActive.attackCost}</strong></div> : null}
@@ -575,44 +625,7 @@ export function App() {
                   <p className="eyebrow">Mano del jugador</p>
                   <span className="chip">{match.playerHand.length} cartas</span>
                 </div>
-
-                <div className="hand-fan">
-                  {match.playerHand.map((card, index) => {
-                    return (
-                      <article
-                        key={card.id}
-                        className={`hand-card ${match.phase === 'selecting-active' ? 'is-selectable' : 'is-locked'}`}
-                        ref={(node) => {
-                          handRefs.current[index] = node;
-                          handCardMapRef.current[card.id] = node;
-                        }}
-                      >
-                        <div className="hand-card__image">
-                          <img src={card.imageLarge || card.imageSmall} alt={`Carta de ${card.name}`} loading="lazy" />
-                        </div>
-
-                        <div className="hand-card__body">
-                          <div className="hand-card__topline">
-                            <h3>{card.name}</h3>
-                            <span>{card.hp} HP</span>
-                          </div>
-
-                          <div className="chip-row">
-                            <span className="chip chip--accent">{card.type}</span>
-                            <span className="chip">Daño {card.attackDamage}</span>
-                            <span className="chip">Costo {card.attackCost}</span>
-                          </div>
-
-                          <p className="hand-card__attack">{card.attackName}</p>
-
-                          <button type="button" className="secondary-action full-width" onClick={() => handleSelectPlayerActive(card.id)} disabled={match.phase !== 'selecting-active'}>
-                            {match.phase === 'selecting-active' ? 'Poner como activo' : 'Reservada en mano'}
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
+                {/* Hand cards are now rendered in 3D */}
               </div>
 
               <section className="battle-log-anchor info-panel">
