@@ -24,6 +24,7 @@ export function buildHandMeshes(
       metalness: 0.1,
       transparent: true,
       opacity: 1,
+      side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(cardGeo, mat);
     mesh.userData = { cardId: card.id, isHand: true };
@@ -94,6 +95,7 @@ export async function createActiveCard3D(battler: Battler, scene: THREE.Scene, p
     roughness: 0.2,
     metalness: 0.1,
     transparent: true,
+    side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.6), mat);
   mesh.userData = { isPlayerActive: true };
