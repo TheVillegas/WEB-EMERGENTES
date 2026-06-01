@@ -4,7 +4,7 @@ import type { BattleSceneController, CardMesh, ActiveCard3D } from './types';
 import type { Card } from '../features/cards/types';
 import type { Battler } from '../features/battle/types';
 import { makePlaceholderTexture, progressiveLoad } from './textureLoader';
-import { buildHandMeshes, layoutHand, createActiveCard3D, updateActiveCardHP } from './sceneCards';
+import { buildHandMeshes, layoutHand, createActiveCard3D, updateActiveCardHP, updateActiveCardTexture } from './sceneCards';
 import { PLAYER_ACTIVE_POS, NPC_ACTIVE_POS, DECK_POS_PLAYER, DECK_POS_NPC, DISCARD_POS_PLAYER, DISCARD_POS_NPC } from './sceneCardLayout';
 import { animateSummonCard, animateAttackMove, animateDamageReceive } from './animations';
 
@@ -239,7 +239,12 @@ export function buildBattleScene(
           updateActiveCardHP(c);
         });
       } else if (player && playerActive3D) {
-        playerActive3D.cardData = player;
+        if (playerActive3D.cardData.id !== player.id) {
+          playerActive3D.cardData = player;
+          updateActiveCardTexture(playerActive3D, placeholder);
+        } else {
+          playerActive3D.cardData = player;
+        }
         updateActiveCardHP(playerActive3D);
       } else if (!player && playerActive3D) {
         scene.remove(playerActive3D.mesh);
@@ -255,7 +260,12 @@ export function buildBattleScene(
           updateActiveCardHP(c);
         });
       } else if (npc && npcActive3D) {
-        npcActive3D.cardData = npc;
+        if (npcActive3D.cardData.id !== npc.id) {
+          npcActive3D.cardData = npc;
+          updateActiveCardTexture(npcActive3D, placeholder);
+        } else {
+          npcActive3D.cardData = npc;
+        }
         updateActiveCardHP(npcActive3D);
       } else if (!npc && npcActive3D) {
         scene.remove(npcActive3D.mesh);

@@ -586,6 +586,12 @@ export function App() {
               </section>
 
               <div className="board-plane">
+                {match.phase === 'selecting-active' && match.turn === 'player' ? (
+                  <div className="selection-instruction">
+                    <h2>Selecciona tu carta con las flechas del teclado</h2>
+                  </div>
+                ) : null}
+                
                 <div className="field-tag field-tag--top">NPC / Rival</div>
                 <div className="field-tag field-tag--bottom">Jugador</div>
 
@@ -597,7 +603,6 @@ export function App() {
                 </div>
 
                 <div className="combat-lane">
-                  <span className="combat-lane__label">Attack Lane</span>
                   <div className={`attack-beam attack-beam--${attackFx?.attacker ?? 'player'} ${attackFx ? 'is-active' : ''}`} ref={beamRef} />
                   <div className={`damage-badge damage-badge--${attackFx?.attacker === 'player' ? 'top' : 'bottom'} ${attackFx ? 'is-active' : ''}`} ref={damageRef}>-{attackFx?.damage ?? 0}</div>
                 </div>
