@@ -3,9 +3,16 @@ export type CsvCardRow = {
   categoria?: string;
   tipo?: string;
   hp?: string;
+  debilidad?: string;
+  resistencia?: string;
   ataque_1_nombre?: string;
   ataque_1_dano?: string;
   ataque_1_costo?: string;
+  ataque_1_efecto?: string;
+  ataque_2_nombre?: string;
+  ataque_2_dano?: string;
+  ataque_2_costo?: string;
+  ataque_2_efecto?: string;
   imagen_small?: string;
   imagen_large?: string;
 };
@@ -22,6 +29,8 @@ export type Card = {
   imageSmall: string;
   imageLarge: string;
 };
+
+export type { TcgCard } from '../tcg-engine/types';
 
 export const DEFAULT_CARD_IMAGE =
   'https://images.pokemontcg.io/base1/1.png';

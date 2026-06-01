@@ -1,7 +1,21 @@
-import type { Battler, GameState, TurnOwner, Winner } from './types';
+import type { Battler, DeckType, Difficulty, GameState, TurnOwner, Winner } from './types';
 import type { Card } from '../cards/types';
 
 const DEFAULT_HAND_SIZE = 3;
+
+function getDeckCards(catalog: Card[], type: DeckType): Card[] {
+  return catalog.filter((card) => card.type.toLowerCase().includes(type.toLowerCase()) || type === 'Fuego' && card.type === 'Fire' || type === 'Agua' && card.type === 'Water' || type === 'Planta' && card.type === 'Grass').slice(0, 10);
+}
+
+function getNpcCards(catalog: Card[], difficulty: Difficulty): Card[] {
+  // En dificultad fácil, elegimos cartas débiles (bajo HP)
+  // En normal, las siguientes
+  // En difícil, las de mayor HP
+  const sorted = [...catalog].sort((a, b) => a.hp - b.hp);
+  if (difficulty === 'Fácil') return sorted.slice(0, 10);
+  if (difficulty === 'Difícil') return sorted.slice(-10).reverse();
+  return catalog.slice(10, 20); // Normal
+}
 
 function appendLog(log: string[], entry: string): string[] {
   return [...log, entry];
@@ -19,9 +33,11 @@ function replaceActive(state: GameState, owner: TurnOwner, battler: Battler | nu
   return owner === 'player' ? { ...state, playerActive: battler } : { ...state, npcActive: battler };
 }
 
-export function createMatch(catalog: Card[], matchId: number, handSize: number = DEFAULT_HAND_SIZE): GameState {
-  const playerHand = catalog.slice(0, handSize);
-  const npcPool = catalog.slice(handSize, handSize * 2);
+export function createMatch(catalog: Card[], matchId: number, deckType: DeckType = 'Fuego', difficulty: Difficulty = 'Normal', handSize: number = DEFAULT_HAND_SIZE): GameState {
+  const playerPool = getDeckCards(catalog, deckType);
+  const playerHand = playerPool.length >= handSize ? playerPool.slice(0, handSize) : catalog.slice(0, handSize);
+  
+  const npcPool = getNpcCards(catalog, difficulty);
   const npcActiveCard = npcPool[0] ?? catalog[handSize] ?? catalog[0] ?? null;
 
   return {
@@ -185,5 +201,5 @@ export function resolveAttack(state: GameState, owner: TurnOwner): GameState {
 }
 
 export function resetMatch(state: GameState): GameState {
-  return createMatch(state.catalog, state.matchId + 1);
+  return createMatch(state.catalog, state.matchId + 1); // Note: In store, we pass deck and difficulty directly now
 }

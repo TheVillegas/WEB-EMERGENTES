@@ -48,27 +48,13 @@
 }
 
 @keyframes catalog-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 /* ── Error ──────────────────────────────────────────────────── */
-.catalog-error-icon {
-  font-size: 48px;
-  margin: 0;
-}
-
-.catalog-error-title {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.catalog-error-sub {
-  color: var(--muted);
-  margin: 0;
-}
+.catalog-error-icon { font-size: 48px; margin: 0; }
+.catalog-error-title { font-size: 20px; font-weight: 700; margin: 0; }
+.catalog-error-sub { color: var(--muted); margin: 0; }
 
 /* ── Page header ─────────────────────────────────────────────── */
 .catalog-header {
@@ -85,10 +71,7 @@
   z-index: 20;
 }
 
-.catalog-header__brand {
-  display: grid;
-  gap: 4px;
-}
+.catalog-header__brand { display: grid; gap: 4px; }
 
 .catalog-header__title {
   font-family: 'Chakra Petch', sans-serif;
@@ -187,13 +170,8 @@
   appearance: none;
 }
 
-.catalog-searchbar__input::placeholder {
-  color: var(--muted);
-}
-
-.catalog-searchbar__input::-webkit-search-cancel-button {
-  display: none;
-}
+.catalog-searchbar__input::placeholder { color: var(--muted); }
+.catalog-searchbar__input::-webkit-search-cancel-button { display: none; }
 
 .catalog-searchbar__clear {
   flex-shrink: 0;
@@ -225,9 +203,7 @@
   padding: 20px 20px;
 }
 
-.catalog-center-panel__search {
-  flex-shrink: 0;
-}
+.catalog-center-panel__search { flex-shrink: 0; }
 
 .catalog-center-panel__grid {
   flex: 1;
@@ -346,13 +322,9 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
-.catalog-empty-state--compact {
-  min-height: 160px;
-}
+.catalog-empty-state--compact { min-height: 160px; }
 
-.catalog-empty-state__icon {
-  font-size: 36px;
-}
+.catalog-empty-state__icon { font-size: 36px; }
 
 .catalog-empty-state__title {
   font-family: 'Chakra Petch', sans-serif;
@@ -490,15 +462,8 @@
 }
 
 @keyframes catalog-sprite-float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-8px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
 }
 
 .catalog-sprite-placeholder {
@@ -572,13 +537,8 @@
   gap: 4px;
 }
 
-.catalog-detail-value--danger {
-  color: var(--danger);
-}
-
-.catalog-detail-value--mint {
-  color: var(--mint);
-}
+.catalog-detail-value--danger { color: var(--danger); }
+.catalog-detail-value--mint   { color: var(--mint); }
 
 /* ── Detail sections ─────────────────────────────────────────── */
 .catalog-detail-section {
@@ -662,22 +622,9 @@
   }
 
   /* Mobile order: search → grid → deck → details */
-  .catalog-center-panel {
-    order: 1;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .catalog-deck-panel {
-    order: 2;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .catalog-details-panel {
-    order: 3;
-    border-left: none;
-    border-top: 1px solid var(--line);
-  }
+  .catalog-center-panel { order: 1; border-bottom: 1px solid var(--line); }
+  .catalog-deck-panel   { order: 2; border-right: none; border-bottom: 1px solid var(--line); }
+  .catalog-details-panel { order: 3; border-left: none; border-top: 1px solid var(--line); }
 
   .catalog-grid {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -697,13 +644,8 @@
     gap: 10px;
   }
 
-  .catalog-header__title {
-    font-size: 20px;
-  }
-
-  .catalog-layout {
-    min-height: auto;
-  }
+  .catalog-header__title { font-size: 20px; }
+  .catalog-layout { min-height: auto; }
 }
 
 /* ── 3-D Catalog Room ──────────────────────────────────────────── */
@@ -779,13 +721,8 @@
   outline: none;
 }
 
-.cr-search-bar input::placeholder {
-  color: rgba(147, 197, 253, 0.45);
-}
-
-.cr-search-bar input::-webkit-search-cancel-button {
-  display: none;
-}
+.cr-search-bar input::placeholder { color: rgba(147, 197, 253, 0.45); }
+.cr-search-bar input::-webkit-search-cancel-button { display: none; }
 
 .cr-search-bar__clear {
   width: 34px;
@@ -803,9 +740,7 @@
   justify-content: center;
 }
 
-.cr-search-bar__clear:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
+.cr-search-bar__clear:hover { background: rgba(255, 255, 255, 0.14); }
 
 /* ── Badge ────────────────────────────────────────────────────── */
 .cr-badge {
@@ -860,15 +795,8 @@
 }
 
 @keyframes cr-slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
 }
 
 .cr-details__close {
@@ -891,9 +819,7 @@
   transition: background 140ms;
 }
 
-.cr-details__close:hover {
-  background: rgba(56, 189, 248, 0.18);
-}
+.cr-details__close:hover { background: rgba(56, 189, 248, 0.18); }
 
 .cr-details__img-wrap {
   padding: 0 20px 12px;
@@ -909,9 +835,7 @@
   transition: transform 260ms ease;
 }
 
-.cr-details__img:hover {
-  transform: scale(1.03);
-}
+.cr-details__img:hover { transform: scale(1.03); }
 
 .cr-details__body {
   padding: 0 20px 28px;
@@ -977,54 +901,6 @@
   color: rgba(147, 197, 253, 0.55);
 }
 
-.cr-details__add {
-  position: absolute;
-  bottom: 70px;
-  left: 50px;
-  z-index: 2;
-  margin: 16px 16px 0 auto;
-  width: 96px;
-  height: 36px;
-  border: 1px solid rgba(45, 2, 82, 0.512);
-  border-radius: 10%;
-  background: #340c44;
-  color: #ffffff;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 140ms;
-}
-
-.cr-details__add:hover {
-  background: #4d0258;
-}
-
-.cr-details__goTo {
-  position: relative;
-  bottom: 10px;
-  right: 45px;
-  z-index: 2;
-  margin: 16px 16px 0 auto;
-  width: 96px;
-  height: 36px;
-  border: 1px solid rgba(5, 21, 68, 0.512);
-  border-radius: 10%;
-  background: #001d32;
-  color: #ffffff;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 140ms;
-}
-
-.cr-details__goTo:hover {
-  background: rgba(56, 189, 248, 0.18);
-}
-
 /* ── Hover tooltip ────────────────────────────────────────────── */
 .cr-tooltip {
   position: absolute;
@@ -1045,66 +921,128 @@
 }
 
 @keyframes cr-tooltip-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* ── Flechas de navegación entre paneles ──────────────────────── */
+/* ── Floating Navigation Arrows ──────────────────────────────── */
 .cr-nav-arrow {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 20;
+  z-index: 15;
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 50%;
   background: rgba(4, 12, 24, 0.75);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  color: #38bdf8;
-  font-size: 1.6rem;
-  width: 3rem;
-  height: 5rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
+  color: #93c5fd;
+  font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, border-color 0.2s;
-  backdrop-filter: blur(10px);
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: all 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .cr-nav-arrow:hover {
-  background: rgba(30, 64, 175, 0.6);
-  border-color: rgba(56, 189, 248, 0.7);
+  background: rgba(4, 12, 24, 0.9);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #e2f4ff;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+  transform: translateY(-50%) scale(1.08);
 }
 
-.cr-nav-arrow--left  { left: 1rem; }
-.cr-nav-arrow--right { right: 1rem; }
-
-/* Cuando el panel lateral de detalles está abierto,
-   la flecha derecha se desplaza para no superponerse */
-.cr-root:has(.cr-details) .cr-nav-arrow--right {
-  right: calc(var(--details-panel-width, 320px) + 1rem);
+.cr-nav-arrow:active {
+  transform: translateY(-50%) scale(0.95);
 }
 
-/* ── Indicador de tipo activo ─────────────────────────────────── */
-.cr-panel-indicator {
+.cr-nav-arrow:disabled {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.8);
+}
+
+.cr-nav-arrow--left {
+  left: 32px;
+}
+
+.cr-nav-arrow--right {
+  right: 32px;
+}
+
+/* Dynamically shift right arrow when details panel is open */
+.cr-root--has-details .cr-nav-arrow--right {
+  right: calc(min(320px, 92vw) + 32px);
+}
+
+/* ── Pagination Bottom Bar ──────────────────────────────────── */
+.cr-pagination {
   position: absolute;
-  bottom: 3rem;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 20;
-  background: rgba(4, 12, 24, 0.7);
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  color: #93c5fd;
-  font-size: 0.85rem;
-  letter-spacing: 0.05em;
-  padding: 0.3rem 1rem;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(4, 12, 24, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.15);
   border-radius: 999px;
-  pointer-events: none;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  max-width: 90vw;
+  overflow-x: auto;
+  /* Hide scrollbar */
+  scrollbar-width: none;
+}
+
+.cr-pagination::-webkit-scrollbar {
+  display: none;
+}
+
+/* Move the hint text above the pagination if pagination exists */
+.cr-root--has-pagination .cr-hint {
+  bottom: 84px;
+}
+
+.cr-pagination-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(147, 197, 253, 0.7);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 200ms ease;
+}
+
+.cr-pagination-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2f4ff;
+}
+
+.cr-pagination-pill--active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(124, 240, 200, 0.15) 100%);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #e2f4ff;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.2);
+}
+
+@media (max-width: 768px) {
+  .cr-nav-arrow {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+  .cr-nav-arrow--left { left: 16px; }
+  .cr-nav-arrow--right { right: 16px; }
+  .cr-pagination-pill { padding: 6px 12px; font-size: 12px; }
+  .cr-pagination { bottom: 16px; }
+  .cr-root--has-pagination .cr-hint { bottom: 70px; }
 }
