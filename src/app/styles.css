@@ -904,6 +904,145 @@ button.is-keyboard-focused {
   border-color: var(--cyan);
 }
 
+/* ── Name Entry Form ───────────────────────────────────── */
+.name-entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.name-input {
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(10, 20, 38, 0.6);
+  backdrop-filter: blur(12px);
+  color: var(--text);
+  font-size: 16px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.name-input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px rgba(76, 215, 255, 0.25);
+}
+
+.name-input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.primary-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-color: rgba(123, 214, 255, 0.08);
+}
+
+/* ── Tutorial Screen ───────────────────────────────────── */
+.tutorial-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 80px;
+  width: 100%;
+  max-width: 720px;
+  text-align: left;
+  overflow-y: auto;
+  max-height: 70vh;
+  padding-right: 8px;
+}
+
+.tutorial-container::-webkit-scrollbar {
+  width: 6px;
+}
+.tutorial-container::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+
+.tutorial-section {
+  border: 1px solid var(--line);
+  background: rgba(10, 20, 38, 0.55);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.tutorial-section h3 {
+  font-size: 20px;
+  margin-bottom: 16px;
+  color: var(--cyan);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.tutorial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.tutorial-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(123, 214, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.key-badge {
+  display: inline-block;
+  background: #152238;
+  border: 1px solid #30476e;
+  border-bottom: 3px solid #1a2f50;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  color: #fff;
+  width: fit-content;
+  font-size: 14px;
+}
+
+.tutorial-rules {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tutorial-rules li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.tutorial-rules li::before {
+  content: '✦';
+  position: absolute;
+  left: 0;
+  color: var(--mint);
+}
+
+.tutorial-rules code {
+  background: rgba(124, 240, 200, 0.1);
+  color: var(--mint);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 .selection-instruction {
   position: absolute;
   top: 40%;

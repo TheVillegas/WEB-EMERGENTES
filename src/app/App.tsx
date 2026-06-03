@@ -10,6 +10,8 @@ import { CatalogPage } from '../features/catalog/CatalogPage';
 import { MainMenu } from './MainMenu';
 import { DeckSelection } from '../DeckSeleccion/DeckSelection';
 import { DifficultySelection } from './DifficultySelection';
+import { NameEntry } from './NameEntry';
+import { Tutorial } from './Tutorial';
 
 gsap.registerPlugin(useGSAP);
 
@@ -172,11 +174,12 @@ function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'play
   );
 }
 
-type AppView = 'menu' | 'deck-selection' | 'difficulty-selection' | 'battle' | 'catalog';
+type AppView = 'name-entry' | 'menu' | 'deck-selection' | 'difficulty-selection' | 'battle' | 'catalog' | 'tutorial';
 
 export function App() {
-  const [view, setView] = useState<AppView>('menu');
+  const [view, setView] = useState<AppView>('name-entry');
   const [previousView, setPreviousView] = useState<AppView>('menu');
+  const [playerName, setPlayerName] = useState('Jugador');
   const [showResult, setShowResult] = useState(false);
   const [focusedArea, setFocusedArea] = useState<'hand' | 'actions'>('hand');
   const [focusedHandIndex, setFocusedHandIndex] = useState(0);
@@ -538,7 +541,39 @@ export function App() {
         </div>
       ) : null}
 
-      {view === 'menu' ? <MainMenu onStart={() => { unlockAudio(); setView('deck-selection'); }} onCatalog={() => { unlockAudio(); setPreviousView('menu'); setView('catalog'); }} /> : null}
+      {view === 'name-entry' ? (
+        <NameEntry
+          onConfirm={(name) => {
+            setPlayerName(name);
+            unlockAudio();
+            setView('menu');
+          }}
+        />
+      ) : null}
+
+      {view === 'menu' ? (
+        <MainMenu
+          onStart={() => {
+            unlockAudio();
+            setView('deck-selection');
+          }}
+          onCatalog={() => {
+            unlockAudio();
+            setPreviousView('menu');
+            setView('catalog');
+          }}
+          onTutorial={() => {
+            unlockAudio();
+            setView('tutorial');
+          }}
+        />
+      ) : null}
+
+      {view === 'tutorial' ? (
+        <Tutorial
+          onBack={() => setView('menu')}
+        />
+      ) : null}
 
       {view === 'deck-selection' ? <DeckSelection onSelect={() => setView('difficulty-selection')} onBack={() => setView('menu')} /> : null}
 
@@ -561,7 +596,7 @@ export function App() {
                 </div>
 
                 <div className="hud-stats">
-                  <article><span>Turno</span><strong>{match.turn === 'player' ? 'Jugador' : 'NPC'}</strong></article>
+                  <article><span>Turno</span><strong>{match.turn === 'player' ? playerName : 'NPC'}</strong></article>
                   <article><span>Fase</span><strong>{getPhaseLabel(match.phase, match)}</strong></article>
                   <article><span>Ritmo</span><strong>{match.pendingNpc ? 'Resolviendo NPC' : 'Tu decisión'}</strong></article>
                 </div>
@@ -593,7 +628,7 @@ export function App() {
                 ) : null}
                 
                 <div className="field-tag field-tag--top">NPC / Rival</div>
-                <div className="field-tag field-tag--bottom">Jugador</div>
+                <div className="field-tag field-tag--bottom">{playerName}</div>
 
                 <div className="opponent-deck-slot"><ZonePile label="Deck" /></div>
                 <div className="opponent-discard-slot"><ZonePile label="Discard" /></div>

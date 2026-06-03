@@ -5,9 +5,10 @@ import { useGSAP } from '@gsap/react';
 type MainMenuProps = {
   onStart: () => void;
   onCatalog: () => void;
+  onTutorial: () => void;
 };
 
-export function MainMenu({ onStart, onCatalog }: MainMenuProps) {
+export function MainMenu({ onStart, onCatalog, onTutorial }: MainMenuProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useGSAP(
@@ -44,6 +45,10 @@ export function MainMenu({ onStart, onCatalog }: MainMenuProps) {
 
           <button type="button" className="secondary-action menu-btn-large" onClick={onCatalog}>
             📖 Ver Catálogo
+          </button>
+
+          <button type="button" className="secondary-action menu-btn-large" onClick={onTutorial}>
+            ℹ️ Tutorial de Controles
           </button>
         </div>
       </div>
