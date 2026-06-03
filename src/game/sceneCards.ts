@@ -24,6 +24,7 @@ export function buildHandMeshes(
       metalness: 0.1,
       transparent: true,
       opacity: 1,
+      side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(cardGeo, mat);
     mesh.userData = { cardId: card.id, isHand: true };
@@ -94,21 +95,16 @@ export async function createActiveCard3D(battler: Battler, scene: THREE.Scene, p
     roughness: 0.2,
     metalness: 0.1,
     transparent: true,
+    side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.6), mat);
   mesh.userData = { isPlayerActive: true };
   scene.add(mesh);
 
+  const activeObj = { mesh, hpBar: new THREE.Mesh(), hpBarBg: new THREE.Mesh(), energyPips: [], glow: new THREE.Mesh(), cardData: battler };
+  
   // Load real texture immediately
-  const url = battler.imageLarge || battler.imageSmall;
-  if (url) {
-    loadTextureAsync(url).then(tex => {
-      if (tex) {
-        mat.map = tex;
-        mat.needsUpdate = true;
-      }
-    });
-  }
+  updateActiveCardTexture(activeObj as ActiveCard3D, placeholder);
 
   // HP Bar background
   const hpBarBg = new THREE.Mesh(
@@ -157,4 +153,31 @@ export function updateActiveCardHP(active: ActiveCard3D) {
   if (ratio <= 0.25) mat.color.setHex(0xff7895);
   else if (ratio <= 0.55) mat.color.setHex(0xffd66c);
   else mat.color.setHex(0x7cf0c8);
+}
+
+export function updateActiveCardTexture(active: ActiveCard3D, placeholder: THREE.Texture) {
+  const mat = active.mesh.material as THREE.MeshStandardMaterial;
+  mat.map = placeholder;
+  mat.needsUpdate = true;
+
+  const smallUrl = active.cardData.imageSmall;
+  const largeUrl = active.cardData.imageLarge;
+
+  const loadTex = async () => {
+    if (smallUrl) {
+      const tex = await loadTextureAsync(smallUrl);
+      if (tex && mat.map === placeholder) {
+        mat.map = tex;
+        mat.needsUpdate = true;
+      }
+    }
+    if (largeUrl && largeUrl !== smallUrl) {
+      const largeTex = await loadTextureAsync(largeUrl);
+      if (largeTex) {
+        mat.map = largeTex;
+        mat.needsUpdate = true;
+      }
+    }
+  };
+  loadTex();
 }

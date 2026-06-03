@@ -46,7 +46,7 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
 
 .three-arena {
   z-index: 0;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .three-arena canvas {
@@ -148,16 +148,7 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
 }
 
 .board-plane::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 32px;
-  border: 1px solid rgba(76, 215, 255, 0.18);
-  background: linear-gradient(180deg, rgba(10, 25, 50, 0.16), rgba(8, 18, 34, 0.12));
-  box-shadow: inset 0 0 48px rgba(76, 215, 255, 0.08);
-  backdrop-filter: blur(2px);
-  transform: perspective(1200px) rotateX(2deg);
-  transform-origin: center;
+  display: none;
 }
 
 .board-plane > * {
@@ -208,14 +199,7 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
 }
 
 .combat-lane::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg, transparent, rgba(124, 240, 200, 0.75), transparent);
-  box-shadow: 0 0 24px rgba(124, 240, 200, 0.28);
+  display: none;
 }
 
 .combat-lane__label {
@@ -918,4 +902,26 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
 button.is-keyboard-focused {
   box-shadow: 0 0 0 2px var(--cyan), 0 0 12px rgba(76, 215, 255, 0.4);
   border-color: var(--cyan);
+}
+
+.selection-instruction {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(4, 10, 20, 0.74);
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 240, 200, 0.2);
+  color: var(--mint);
+  box-shadow: 0 0 24px rgba(124, 240, 200, 0.15);
+  animation: pulseInstruction 2s infinite;
+}
+
+@keyframes pulseInstruction {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; text-shadow: 0 0 8px rgba(124, 240, 200, 0.6); }
 }

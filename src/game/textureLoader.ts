@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import type { CardMesh } from './types';
 
 const TEXTURE_CHUNK_SIZE = 4;
-const BATCH_DELAY_MS = 100;
-const INITIAL_DELAY_MS = 1000;
+const BATCH_DELAY_MS = 10;
+const INITIAL_DELAY_MS = 10;
 
 export const textureCache = new Map<string, THREE.Texture>();
 const loader = new THREE.TextureLoader();
