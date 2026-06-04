@@ -42,11 +42,19 @@ export function DifficultySelection({ onSelect, onBack }: DifficultySelectionPro
         <button type="button" className="secondary-action compact-action" onClick={onBack}>
           ← Volver
         </button>
-        <h2>Dificultad del NPC</h2>
+        <h2>Modo de Juego</h2>
         <p className="eyebrow">Selecciona a qué te enfrentarás</p>
       </div>
 
       <div className="diff-list">
+        <article className="diff-card diff-card--pvp" onClick={() => handleSelectDifficulty('1vs1')}>
+          <div className="diff-card__content">
+            <h3>1 vs 1</h3>
+            <p>Juega contra otro jugador en la misma red. ¡Demuestra quién es el mejor entrenador!</p>
+          </div>
+          <div className="diff-card__indicator">⚔️</div>
+        </article>
+
         <article className="diff-card diff-card--easy" onClick={() => handleSelectDifficulty('Fácil')}>
           <div className="diff-card__content">
             <h3>Fácil</h3>

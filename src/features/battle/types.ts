@@ -1,11 +1,11 @@
 import type { Card } from '../cards/types';
 
 export type DeckType = 'Fuego' | 'Agua' | 'Planta';
-export type Difficulty = 'Fácil' | 'Normal' | 'Difícil';
+export type Difficulty = 'Fácil' | 'Normal' | 'Difícil' | '1vs1';
 
 export type TurnOwner = 'player' | 'npc';
 
-export type TurnPhase = 'loading' | 'selecting-active' | 'player-turn' | 'npc-turn' | 'game-over';
+export type TurnPhase = 'loading' | 'selecting-active' | 'player-turn' | 'npc-turn' | 'waiting-for-opponent' | 'opponent-selecting-active' | 'game-over';
 
 export type Winner = TurnOwner | null;
 

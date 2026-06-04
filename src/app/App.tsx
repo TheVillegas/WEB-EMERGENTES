@@ -5,6 +5,7 @@ import { loadCards } from '../features/cards/cardRepository';
 import { canAttack } from '../features/battle/gameEngine';
 import { useBattleStore } from '../features/battle/store';
 import type { Battler, GameState, TurnPhase } from '../features/battle/types';
+import type { PvpMatchInfo } from '../features/multiplayer/multiplayerService';
 import { ThreeArena } from '../game/ThreeArena';
 import { CatalogPage } from '../features/catalog/CatalogPage';
 import { MainMenu } from './MainMenu';
@@ -28,9 +29,11 @@ function preloadImage(url: string) {
   img.src = url;
 }
 
-function getPhaseLabel(phase: TurnPhase, match: GameState): string {
+function getPhaseLabel(phase: TurnPhase, match: GameState, isPvp: boolean): string {
+  if (phase === 'waiting-for-opponent') return 'Esperando rival';
+  if (phase === 'opponent-selecting-active') return 'Rival eligiendo';
   if (phase === 'selecting-active') return 'Elegir carta';
-  if (phase === 'npc-turn') return 'Turno NPC';
+  if (phase === 'npc-turn') return isPvp ? 'Turno Rival' : 'Turno NPC';
   if (phase === 'game-over') return 'Final';
   if (match.turn === 'player') return match.energyAssignedThisTurn ? 'Ataque o pase' : 'Asignar energía';
   return 'Resolución';
@@ -172,7 +175,80 @@ function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'play
   );
 }
 
-type AppView = 'menu' | 'deck-selection' | 'difficulty-selection' | 'battle' | 'catalog';
+type PvpLobbyProps = {
+  pvpStatus: 'idle' | 'searching' | 'matched' | 'disconnected';
+  pvpMatchInfo: PvpMatchInfo | null;
+  onSearch: () => void;
+  onCancel: () => void;
+  onStartBattle: () => void;
+};
+
+function PvpLobby({ pvpStatus, pvpMatchInfo, onSearch, onCancel, onStartBattle }: PvpLobbyProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Auto-start search when the lobby mounts
+    if (pvpStatus === 'idle') {
+      onSearch();
+    }
+  }, []);
+
+  useEffect(() => {
+    // When matched, auto-navigate to battle after a short delay
+    if (pvpStatus === 'matched') {
+      const timer = setTimeout(() => onStartBattle(), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [pvpStatus, onStartBattle]);
+
+  useGSAP(
+    () => {
+      gsap.from('.pvp-lobby__content', {
+        opacity: 0,
+        y: 30,
+        duration: 0.6,
+        ease: 'power3.out',
+      });
+    },
+    { scope: containerRef },
+  );
+
+  return (
+    <div className="menu-screen" ref={containerRef}>
+      <div className="menu-backdrop">
+        <div className="menu-backdrop-glow" />
+      </div>
+
+      <div className="pvp-lobby__content">
+        {pvpStatus === 'searching' && (
+          <>
+            <div className="pvp-lobby__icon">⚔️</div>
+            <h2>Buscando oponente…</h2>
+            <p className="eyebrow">Esperando a que otro jugador se conecte en la misma red</p>
+            <div className="pvp-lobby__spinner">
+              <span /><span /><span />
+            </div>
+            <button type="button" className="secondary-action" onClick={onCancel}>
+              Cancelar búsqueda
+            </button>
+          </>
+        )}
+
+        {pvpStatus === 'matched' && pvpMatchInfo && (
+          <>
+            <div className="pvp-lobby__icon">🎮</div>
+            <h2>¡Oponente encontrado!</h2>
+            <p className="eyebrow">Vs. {pvpMatchInfo.opponentName}</p>
+            <p>Eres el <strong>{pvpMatchInfo.role === 'player1' ? 'Jugador 1' : 'Jugador 2'}</strong></p>
+            <p className="pvp-lobby__starting">Preparando la arena…</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type AppView = 'menu' | 'deck-selection' | 'difficulty-selection' | 'pvp-lobby' | 'battle' | 'catalog';
 
 export function App() {
   const [view, setView] = useState<AppView>('menu');
@@ -185,6 +261,10 @@ export function App() {
     catalogStatus,
     errorMessage,
     match,
+    isPvp,
+    pvpStatus,
+    pvpMatchInfo,
+    selectedDifficulty,
     setCatalogLoading,
     setCatalogError,
     initializeCatalog,
@@ -194,6 +274,9 @@ export function App() {
     playerAttack,
     passPlayerTurn,
     resetCurrentMatch,
+    startPvpSearch,
+    cancelPvpSearch,
+    disconnectPvp,
   } = useBattleStore();
 
   const [attackFx, setAttackFx] = useState<AttackFx | null>(null);
@@ -542,7 +625,25 @@ export function App() {
 
       {view === 'deck-selection' ? <DeckSelection onSelect={() => setView('difficulty-selection')} onBack={() => setView('menu')} /> : null}
 
-      {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => { startMatch(); setView('battle'); }} onBack={() => setView('deck-selection')} /> : null}
+      {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => {
+        startMatch();
+        // If 1vs1 was selected, go to PvP lobby instead of battle
+        const state = useBattleStore.getState();
+        if (state.selectedDifficulty === '1vs1') {
+          setView('pvp-lobby');
+        } else {
+          setView('battle');
+        }
+      }} onBack={() => setView('deck-selection')} /> : null}
+
+      {/* PvP Lobby — waiting for opponent */}
+      {view === 'pvp-lobby' ? <PvpLobby
+        pvpStatus={pvpStatus}
+        pvpMatchInfo={pvpMatchInfo}
+        onSearch={startPvpSearch}
+        onCancel={() => { cancelPvpSearch(); setView('difficulty-selection'); }}
+        onStartBattle={() => setView('battle')}
+      /> : null}
 
       {/* Battle arena — mounted only when view is battle to save GPU */}
       <div style={{ display: view === 'battle' ? 'contents' : 'none' }}>
@@ -561,9 +662,9 @@ export function App() {
                 </div>
 
                 <div className="hud-stats">
-                  <article><span>Turno</span><strong>{match.turn === 'player' ? 'Jugador' : 'NPC'}</strong></article>
-                  <article><span>Fase</span><strong>{getPhaseLabel(match.phase, match)}</strong></article>
-                  <article><span>Ritmo</span><strong>{match.pendingNpc ? 'Resolviendo NPC' : 'Tu decisión'}</strong></article>
+                  <article><span>Turno</span><strong>{match.turn === 'player' ? 'Jugador' : (isPvp ? 'Rival' : 'NPC')}</strong></article>
+                  <article><span>Fase</span><strong>{getPhaseLabel(match.phase, match, isPvp)}</strong></article>
+                  <article><span>Ritmo</span><strong>{match.pendingNpc ? (isPvp ? 'Turno del rival' : 'Resolviendo NPC') : 'Tu decisión'}</strong></article>
                 </div>
 
                 <div className="hud-actions">
@@ -592,7 +693,7 @@ export function App() {
                   </div>
                 ) : null}
                 
-                <div className="field-tag field-tag--top">NPC / Rival</div>
+                <div className="field-tag field-tag--top">{isPvp ? (pvpMatchInfo?.opponentName || 'Rival') : 'NPC / Rival'}</div>
                 <div className="field-tag field-tag--bottom">Jugador</div>
 
                 <div className="opponent-deck-slot"><ZonePile label="Deck" /></div>
@@ -678,8 +779,8 @@ export function App() {
                   </div>
 
                   <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-                    <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>
-                    <button type="button" className="secondary-action" onClick={() => { resetCurrentMatch(); setView('menu'); }}>Menú Principal</button>
+                    {!isPvp && <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>}
+                    <button type="button" className="secondary-action" onClick={() => { if (isPvp) disconnectPvp(); else resetCurrentMatch(); setView('menu'); }}>Menú Principal</button>
                   </div>
                 </div>
               </section>
