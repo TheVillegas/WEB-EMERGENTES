@@ -1,0 +1,88 @@
+.mydeck-root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #040c18;
+}
+
+.mydeck-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.mydeck-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.mydeck-header {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 48px;
+  background: linear-gradient(180deg, rgba(4, 12, 24, 0.9) 0%, rgba(4, 12, 24, 0) 100%);
+}
+
+.mydeck-title-group {
+  text-align: center;
+}
+
+.mydeck-title-group h2 {
+  margin: 0;
+  font-size: 2.5rem;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+}
+
+.mydeck-hint {
+  text-align: center;
+  margin-bottom: 24px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mydeck-tooltip {
+  pointer-events: none;
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px;
+  padding: 16px 24px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  min-width: 200px;
+}
+
+.mydeck-tooltip h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.25rem;
+  color: #fff;
+}
+
+.mydeck-tooltip-attack {
+  margin: 8px 0 0 0;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+}

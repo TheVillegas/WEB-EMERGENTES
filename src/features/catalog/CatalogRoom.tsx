@@ -5,14 +5,14 @@ import { useBattleStore } from '../battle/store';
 import { wrapAsCardCatalog } from './catalogUtils';
 import type { CatalogCard } from './types';
 
-// ─── Layout constants ──────────────────────────────────────────────────────
+// ─── Constantes ──────────────────────────────────────────────────────
 const CARD_W = 1.4;
 const CARD_H = 2.0;
 const GAP_X = 0.22;
 const GAP_Y = 0.30;
 const COLS = 8;
 const ROWS = 6;
-const PER_PANEL = COLS * ROWS;          // 48 cards per panel
+const PER_PANEL = COLS * ROWS;          // 48 cartas por cada panel
 
 // Type colour palette keyed on card type
 const TYPE_COLORS: Record<string, string> = {
@@ -105,9 +105,12 @@ export function CatalogRoom({ onGoToDeck }: { onGoToDeck?: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<ReturnType<typeof buildScene> | null>(null);
   const catalog = useBattleStore((s) => s.catalog);
-
-  // Uncomment the following when you implement real Add to Deck state management logic.
-  // const addToDeck = useBattleStore((s) => s.addToDeck);
+  const deckEditMode = useBattleStore((s) => s.deckEditMode);
+  const updateCustomDeckCard = useBattleStore((s) => s.updateCustomDeckCard);
+  const setDeckEditMode = useBattleStore((s) => s.setDeckEditMode);
+  const selectedDeck = useBattleStore((s) => s.selectedDeck);
+  const customDecks = useBattleStore((s) => s.customDecks);
+  const currentDeckIds = selectedDeck && customDecks[selectedDeck] ? customDecks[selectedDeck] : [];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
@@ -121,9 +124,16 @@ export function CatalogRoom({ onGoToDeck }: { onGoToDeck?: () => void }) {
   const cards = useMemo(() => catalog.map(wrapAsCardCatalog), [catalog]);
 
   const filtered = useMemo(() => {
+    let result = cards;
+    if (deckEditMode?.allowedType) {
+      result = result.filter(c => c.type === deckEditMode.allowedType);
+    }
+    if (deckEditMode?.isEditing && currentDeckIds.length > 0) {
+      result = result.filter(c => !currentDeckIds.includes(c.id));
+    }
     const q = searchQuery.trim().toLowerCase();
-    return q ? cards.filter(c => c.name.toLowerCase().includes(q)) : cards;
-  }, [cards, searchQuery]);
+    return q ? result.filter(c => c.name.toLowerCase().includes(q)) : result;
+  }, [cards, searchQuery, deckEditMode?.allowedType, deckEditMode?.isEditing, currentDeckIds]);
 
   const panelGroups = useMemo(() => {
     return groupByType(filtered).filter(g => g.cards.length > 0);
@@ -163,6 +173,18 @@ export function CatalogRoom({ onGoToDeck }: { onGoToDeck?: () => void }) {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const addToDeck = (card: CatalogCard) => {
+    if (deckEditMode?.isEditing && selectedDeck && deckEditMode.slotIndex !== undefined) {
+      updateCustomDeckCard(selectedDeck, deckEditMode.slotIndex, card.id);
+      handleGoToDeck();
+    }
+  };
+
+  const handleGoToDeck = () => {
+    setDeckEditMode(null);
+    if (onGoToDeck) onGoToDeck();
+  };
+
   const handleGoToPanel = (idx: number) => {
     sceneRef.current?.goToPanel(idx);
     setCurrentPanel(idx);
@@ -185,8 +207,7 @@ export function CatalogRoom({ onGoToDeck }: { onGoToDeck?: () => void }) {
   function handleAddToDeck() {
     if (!selectedCard) return;
 
-    // Uncomment the following when you implement real Add to Deck state management logic.
-    // addToDeck(selectedCard);
+    addToDeck(selectedCard);
 
     setAddedFeedback(true);
     setTimeout(() => setAddedFeedback(false), 1800);
@@ -239,7 +260,7 @@ export function CatalogRoom({ onGoToDeck }: { onGoToDeck?: () => void }) {
 
       {/* Contenedor de información de cartas */}
       <div className="cr-badge">
-        {filtered.length} carta{filtered.length !== 1 ? 's' : ''}
+        {deckEditMode?.allowedType ? `Filtrado por: ${deckEditMode.allowedType} - ` : ''}{filtered.length} carta{filtered.length !== 1 ? 's' : ''}
       </div>
 
       {/* Barra de paginación inferior */}

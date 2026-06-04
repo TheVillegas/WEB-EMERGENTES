@@ -2,7 +2,7 @@ import { useBattleStore } from '../battle/store';
 import { CatalogRoom } from './CatalogRoom';
 import './catalog.css';
 
-export function CatalogPage() {
+export function CatalogPage({ onGoToDeck }: { onGoToDeck?: () => void }) {
   const catalogStatus = useBattleStore((s) => s.catalogStatus);
 
   if (catalogStatus === 'loading') {
@@ -28,7 +28,7 @@ export function CatalogPage() {
 
   return (
     <div className="catalog-page catalog-page--3d">
-      <CatalogRoom />
+      <CatalogRoom onGoToDeck={onGoToDeck} />
     </div>
   );
 }
