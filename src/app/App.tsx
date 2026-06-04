@@ -10,6 +10,7 @@ import { CatalogPage } from '../features/catalog/CatalogPage';
 import { MainMenu } from './MainMenu';
 import { DeckSelection } from '../DeckSeleccion/DeckSelection';
 import { DifficultySelection } from './DifficultySelection';
+import { MyDeckRoom } from '../features/myDeck/MyDeckRoom';
 
 gsap.registerPlugin(useGSAP);
 
@@ -172,7 +173,7 @@ function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'play
   );
 }
 
-type AppView = 'menu' | 'deck-selection' | 'difficulty-selection' | 'battle' | 'catalog';
+type AppView = 'menu' | 'deck-selection' | 'my-deck' | 'difficulty-selection' | 'battle' | 'catalog';
 
 export function App() {
   const [view, setView] = useState<AppView>('menu');
@@ -194,7 +195,14 @@ export function App() {
     playerAttack,
     passPlayerTurn,
     resetCurrentMatch,
+    initCustomDeckIfNeeded,
+    setDeckEditMode,
   } = useBattleStore();
+  const selectedDeck = useBattleStore((s) => s.selectedDeck);
+
+  useEffect(() => {
+    if (selectedDeck) initCustomDeckIfNeeded(selectedDeck);
+  }, [selectedDeck, initCustomDeckIfNeeded]);
 
   const [attackFx, setAttackFx] = useState<AttackFx | null>(null);
   const rootRef = useRef<HTMLElement | null>(null);
@@ -210,6 +218,7 @@ export function App() {
   const previousMatchRef = useRef<GameState | null>(null);
   const resultAudioRef = useRef<HTMLAudioElement | null>(null);
   const battleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const catalogAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlockedRef = useRef(false);
 
   // Desbloquea el autoplay del navegador en el primer click del usuario
@@ -267,7 +276,7 @@ export function App() {
 
   useEffect(() => {
     if (view !== 'battle' || !match || showResult || catalogStatus !== 'ready') return;
-    
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp') {
         if (focusedArea === 'hand' && match.playerActive) {
@@ -306,7 +315,7 @@ export function App() {
         e.preventDefault();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [view, match, showResult, catalogStatus, focusedArea, focusedHandIndex, focusedActionIndex, playerCanAssignEnergy, playerCanAttack, playerCanPass]);
@@ -402,6 +411,23 @@ export function App() {
       }
     }
   }, [view, Boolean(match), showResult]);
+
+  useEffect(() => {
+    if (view === 'catalog') {
+      const audio = new Audio('/audio/music/Pokemon-Diamond-Pearl.mp3');
+      audio.volume = 0.35;
+      audio.loop = true;
+      audio.play().catch(() => { });
+      catalogAudioRef.current = audio;
+    } else {
+      if (catalogAudioRef.current) {
+        catalogAudioRef.current.pause();
+        catalogAudioRef.current.currentTime = 0;
+        catalogAudioRef.current = null;
+      }
+    }
+
+  }, [view]);
 
   useGSAP(
     () => {
@@ -534,15 +560,30 @@ export function App() {
               ← {previousView === 'menu' ? 'Volver al menú' : 'Volver a la batalla'}
             </button>
           </div>
-          <CatalogPage />
+          <CatalogPage onGoToDeck={() => setView('my-deck')} />
         </div>
       ) : null}
 
       {view === 'menu' ? <MainMenu onStart={() => { unlockAudio(); setView('deck-selection'); }} onCatalog={() => { unlockAudio(); setPreviousView('menu'); setView('catalog'); }} /> : null}
 
-      {view === 'deck-selection' ? <DeckSelection onSelect={() => setView('difficulty-selection')} onBack={() => setView('menu')} /> : null}
+      {view === 'deck-selection' ? <DeckSelection onSelect={() => setView('my-deck')} onBack={() => setView('menu')} /> : null}
 
-      {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => { startMatch(); setView('battle'); }} onBack={() => setView('deck-selection')} /> : null}
+      {view === 'my-deck' ? (
+        <MyDeckRoom
+          onBack={() => setView('deck-selection')}
+          onNext={() => setView('difficulty-selection')}
+          onEditCard={(index) => {
+            if (selectedDeck) {
+              const allowedType = selectedDeck === 'Fuego' ? 'Fire' : selectedDeck === 'Agua' ? 'Water' : 'Grass';
+              setDeckEditMode({ isEditing: true, slotIndex: index, allowedType });
+              setPreviousView('my-deck');
+              setView('catalog');
+            }
+          }}
+        />
+      ) : null}
+
+      {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => { startMatch(); setView('battle'); }} onBack={() => setView('my-deck')} /> : null}
 
       {/* Battle arena — mounted only when view is battle to save GPU */}
       <div style={{ display: view === 'battle' ? 'contents' : 'none' }}>
@@ -591,7 +632,7 @@ export function App() {
                     <h2>Selecciona tu carta con las flechas del teclado</h2>
                   </div>
                 ) : null}
-                
+
                 <div className="field-tag field-tag--top">NPC / Rival</div>
                 <div className="field-tag field-tag--bottom">Jugador</div>
 

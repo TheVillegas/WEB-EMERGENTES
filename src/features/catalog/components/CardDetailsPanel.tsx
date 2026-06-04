@@ -7,16 +7,16 @@ interface CardDetailsPanelProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  Fire:      '#ff7258',
-  Water:     '#4cd7ff',
-  Grass:     '#7cf0c8',
+  Fire: '#ff7258',
+  Water: '#4cd7ff',
+  Grass: '#7cf0c8',
   Lightning: '#ffd66c',
-  Psychic:   '#c678f5',
-  Fighting:  '#e08060',
+  Psychic: '#c678f5',
+  Fighting: '#e08060',
   Colorless: '#99adc5',
-  Darkness:  '#8890b0',
-  Metal:     '#a0b8d0',
-  Dragon:    '#7b8cef',
+  Darkness: '#8890b0',
+  Metal: '#a0b8d0',
+  Dragon: '#7b8cef',
 };
 
 function getTypeColor(type: string): string {
@@ -67,7 +67,6 @@ function EnergyPips({ count }: { count: number }) {
   return (
     <span className="catalog-energy-pips">
       {Array.from({ length: count }).map((_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: static index is fine here
         <span key={i} className="energy-pip is-filled" />
       ))}
     </span>

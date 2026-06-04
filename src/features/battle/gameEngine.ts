@@ -3,7 +3,7 @@ import type { Card } from '../cards/types';
 
 const DEFAULT_HAND_SIZE = 3;
 
-function getDeckCards(catalog: Card[], type: DeckType): Card[] {
+export function getDeckCards(catalog: Card[], type: DeckType): Card[] {
   return catalog.filter((card) => card.type.toLowerCase().includes(type.toLowerCase()) || type === 'Fuego' && card.type === 'Fire' || type === 'Agua' && card.type === 'Water' || type === 'Planta' && card.type === 'Grass').slice(0, 10);
 }
 
@@ -33,8 +33,16 @@ function replaceActive(state: GameState, owner: TurnOwner, battler: Battler | nu
   return owner === 'player' ? { ...state, playerActive: battler } : { ...state, npcActive: battler };
 }
 
-export function createMatch(catalog: Card[], matchId: number, deckType: DeckType = 'Fuego', difficulty: Difficulty = 'Normal', handSize: number = DEFAULT_HAND_SIZE): GameState {
-  const playerPool = getDeckCards(catalog, deckType);
+export function createMatch(catalog: Card[], matchId: number, deckType: DeckType = 'Fuego', difficulty: Difficulty = 'Normal', handSize: number = DEFAULT_HAND_SIZE, customDeckIds?: string[]): GameState {
+  let playerPool: Card[] = [];
+  if (customDeckIds && customDeckIds.length > 0) {
+    playerPool = customDeckIds.map((id) => catalog.find((c) => c.id === id)).filter(Boolean) as Card[];
+  }
+  
+  if (playerPool.length === 0) {
+    playerPool = getDeckCards(catalog, deckType);
+  }
+
   const playerHand = playerPool.length >= handSize ? playerPool.slice(0, handSize) : catalog.slice(0, handSize);
   
   const npcPool = getNpcCards(catalog, difficulty);
