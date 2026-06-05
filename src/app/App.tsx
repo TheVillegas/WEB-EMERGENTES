@@ -181,6 +181,10 @@ export function App() {
   const [previousView, setPreviousView] = useState<AppView>('menu');
   const [playerName, setPlayerName] = useState('Jugador');
   const [showResult, setShowResult] = useState(false);
+  const [showConfirmExit, setShowConfirmExit] = useState(false);
+  const [navigationPath, setNavigationPath] = useState<Array<{ timestamp: string; username: string; view: string }>>([
+    { timestamp: new Date().toLocaleString(), username: 'Jugador', view: 'name-entry' }
+  ]);
   const [focusedArea, setFocusedArea] = useState<'hand' | 'actions'>('hand');
   const [focusedHandIndex, setFocusedHandIndex] = useState(0);
   const [focusedActionIndex, setFocusedActionIndex] = useState(0);
@@ -227,6 +231,42 @@ export function App() {
     src.buffer = buf;
     src.connect(ctx.destination);
     src.start(0);
+  };
+
+  // Función para registrar la navegación y actualizar la vista
+  const handleNavigate = (nextView: AppView, customName?: string) => {
+    const activeName = customName !== undefined ? customName : playerName;
+    const logTime = new Date().toLocaleString();
+    setNavigationPath((prev) => [...prev, { timestamp: logTime, username: activeName, view: nextView }]);
+    setView(nextView);
+  };
+
+  // Función para exportar logs en formato CSV y descargarlo
+  const handleDownloadLogsCSV = () => {
+    // Encabezados
+    const headers = ['Fecha y hora de inicio de prueba', 'Nombre de usuario', 'Ruta de las opciones que escoje'];
+    
+    // Crear filas CSV para cada entrada del log
+    const rows = navigationPath.map(item => [
+      item.timestamp,
+      item.username,
+      item.view
+    ]);
+    
+    const csvContent = [
+      headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+      ...rows.map(row => row.map(r => `"${r.replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    // Descargar el archivo CSV
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `log_prueba_${playerName.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   useEffect(() => {
@@ -531,7 +571,7 @@ export function App() {
               type="button"
               id="catalog-back-btn"
               className="secondary-action catalog-nav-btn"
-              onClick={() => setView(previousView)}
+              onClick={() => handleNavigate(previousView)}
               aria-label={previousView === 'menu' ? "Volver al menú" : "Volver a la batalla"}
             >
               ← {previousView === 'menu' ? 'Volver al menú' : 'Volver a la batalla'}
@@ -546,7 +586,7 @@ export function App() {
           onConfirm={(name) => {
             setPlayerName(name);
             unlockAudio();
-            setView('menu');
+            handleNavigate('menu', name);
           }}
         />
       ) : null}
@@ -555,29 +595,32 @@ export function App() {
         <MainMenu
           onStart={() => {
             unlockAudio();
-            setView('deck-selection');
+            handleNavigate('deck-selection');
           }}
           onCatalog={() => {
             unlockAudio();
             setPreviousView('menu');
-            setView('catalog');
+            handleNavigate('catalog');
           }}
           onTutorial={() => {
             unlockAudio();
-            setView('tutorial');
+            handleNavigate('tutorial');
+          }}
+          onExitTest={() => {
+            setShowConfirmExit(true);
           }}
         />
       ) : null}
 
       {view === 'tutorial' ? (
         <Tutorial
-          onBack={() => setView('menu')}
+          onBack={() => handleNavigate('menu')}
         />
       ) : null}
 
-      {view === 'deck-selection' ? <DeckSelection onSelect={() => setView('difficulty-selection')} onBack={() => setView('menu')} /> : null}
+      {view === 'deck-selection' ? <DeckSelection onSelect={() => handleNavigate('difficulty-selection')} onBack={() => handleNavigate('menu')} /> : null}
 
-      {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => { startMatch(); setView('battle'); }} onBack={() => setView('deck-selection')} /> : null}
+      {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => { startMatch(); handleNavigate('battle'); }} onBack={() => handleNavigate('deck-selection')} /> : null}
 
       {/* Battle arena — mounted only when view is battle to save GPU */}
       <div style={{ display: view === 'battle' ? 'contents' : 'none' }}>
@@ -602,7 +645,7 @@ export function App() {
                 </div>
 
                 <div className="hud-actions">
-                  <button type="button" className="secondary-action compact-action" onClick={() => setView('menu')}>
+                  <button type="button" className="secondary-action compact-action" onClick={() => handleNavigate('menu')}>
                     Menú Principal
                   </button>
                   <button type="button" className="secondary-action compact-action" onClick={startMatch} disabled={catalogStatus !== 'ready'}>
@@ -612,7 +655,7 @@ export function App() {
                     type="button"
                     id="open-catalog-btn"
                     className="secondary-action compact-action catalog-nav-btn"
-                    onClick={() => { setPreviousView('battle'); setView('catalog'); }}
+                    onClick={() => { setPreviousView('battle'); handleNavigate('catalog'); }}
                     aria-label="Abrir catálogo de cartas"
                   >
                     📖 Catálogo
@@ -714,7 +757,7 @@ export function App() {
 
                   <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
                     <button type="button" className="primary-action" onClick={resetCurrentMatch}>Nueva partida</button>
-                    <button type="button" className="secondary-action" onClick={() => { resetCurrentMatch(); setView('menu'); }}>Menú Principal</button>
+                    <button type="button" className="secondary-action" onClick={() => { resetCurrentMatch(); handleNavigate('menu'); }}>Menú Principal</button>
                   </div>
                 </div>
               </section>
@@ -722,6 +765,38 @@ export function App() {
           </>
         ) : null}
       </div>{/* end battle display wrapper */}
+
+      {/* Pantalla Emergente de Confirmación de Salida / Terminar Prueba */}
+      {showConfirmExit ? (
+        <section className="confirm-overlay">
+          <div className="confirm-overlay__backdrop" onClick={() => setShowConfirmExit(false)} />
+          <div className="confirm-panel">
+            <h2>⚠️ Confirmación</h2>
+            <p>¿Estás seguro de que deseas terminar la prueba? Al confirmar, se descargará un archivo CSV con el reporte del log de navegación de esta sesión.</p>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="primary-action danger-action"
+                onClick={() => {
+                  setShowConfirmExit(false);
+                  handleDownloadLogsCSV();
+                }}
+                style={{ padding: '12px 24px' }}
+              >
+                Confirmar y Terminar
+              </button>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => setShowConfirmExit(false)}
+                style={{ padding: '12px 24px' }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

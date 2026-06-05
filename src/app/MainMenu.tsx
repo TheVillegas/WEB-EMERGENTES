@@ -6,9 +6,10 @@ type MainMenuProps = {
   onStart: () => void;
   onCatalog: () => void;
   onTutorial: () => void;
+  onExitTest: () => void;
 };
 
-export function MainMenu({ onStart, onCatalog, onTutorial }: MainMenuProps) {
+export function MainMenu({ onStart, onCatalog, onTutorial, onExitTest }: MainMenuProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useGSAP(
@@ -49,6 +50,10 @@ export function MainMenu({ onStart, onCatalog, onTutorial }: MainMenuProps) {
 
           <button type="button" className="secondary-action menu-btn-large" onClick={onTutorial}>
             ℹ️ Tutorial de Controles
+          </button>
+
+          <button type="button" className="secondary-action danger-action menu-btn-large" onClick={onExitTest}>
+            🚪 Terminar Prueba
           </button>
         </div>
       </div>
