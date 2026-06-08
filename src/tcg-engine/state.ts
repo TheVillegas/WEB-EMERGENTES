@@ -1,4 +1,4 @@
-import type { Battler, EnergyType, GameState, PlayerState, TcgCard } from './types';
+import type { Battler, EnergyType, GameState, PlayerState, PokemonCard, TcgCard } from './types';
 import { ALL_ENERGY_TYPES } from './types';
 
 export function shuffleArray<T>(array: T[]): T[] {
@@ -48,25 +48,92 @@ function createEmptyPlayerState(): PlayerState {
     activeBattler: null,
     hasAttachedEnergy: false,
     hasUsedSupporter: false,
+    hasEvolved: false,
+    hasRetreated: false,
   };
 }
 
-function isPokemonCard(card: TcgCard): card is { card: { types: EnergyType[] } } & TcgCard {
-  return 'types' in card && Array.isArray(card.types);
+export function isPokemonCard(card: TcgCard): card is PokemonCard {
+  return 'types' in card && Array.isArray((card as PokemonCard).types);
 }
 
-function createBattler(card: TcgCard, status: 'active' | 'bench'): Battler | null {
-  if (!isPokemonCard(card)) {
-    return null;
-  }
+export function isBasicPokemon(card: TcgCard): boolean {
+  if (!isPokemonCard(card)) return false;
+  return (card as PokemonCard).stage === 'basic';
+}
+
+export function createBattler(card: PokemonCard, status: 'active' | 'bench'): Battler {
   return {
-    card: card as import('./types').PokemonCard,
+    card,
     currentHp: card.hp,
     attachedEnergies: emptyEnergyZone(),
     status,
   };
 }
 
+/**
+ * Roll a dice (1-6). Even = player1 starts, Odd = player2 starts.
+ */
+export function rollDice(): number {
+  return Math.floor(Math.random() * 6) + 1;
+}
+
+/**
+ * Determine which player goes first based on dice roll.
+ * Even = player1 (index 0), Odd = player2 (index 1).
+ */
+export function determineFirstPlayer(roll: number, turnOrder: string[]): string {
+  return roll % 2 === 0 ? turnOrder[0] : turnOrder[1];
+}
+
+/**
+ * Validate that a hand has at least one basic Pokemon.
+ * If not, reshuffle and redraw (up to maxRetries times).
+ * If all retries fail, search the deck for the first basic Pokemon.
+ */
+function ensureBasicPokemonInHand(
+  deck: TcgCard[],
+  handSize: number,
+  maxRetries: number = 3,
+): { hand: TcgCard[]; deck: TcgCard[] } {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const shuffled = attempt === 0 ? deck : shuffleArray(deck);
+    const hand = shuffled.slice(0, handSize);
+    const remaining = shuffled.slice(handSize);
+
+    const hasBasic = hand.some(isBasicPokemon);
+    if (hasBasic) {
+      return { hand, deck: remaining };
+    }
+
+    // Last attempt: force a basic Pokemon into the hand
+    if (attempt === maxRetries) {
+      const basicIdx = shuffled.findIndex(isBasicPokemon);
+      if (basicIdx >= 0 && basicIdx >= handSize) {
+        // Swap the first non-basic in hand with the found basic
+        const forcedHand = [...hand];
+        forcedHand[0] = shuffled[basicIdx];
+        const forcedDeck = [...remaining];
+        // Put the replaced card back
+        forcedDeck.push(hand[0]);
+        return { hand: forcedHand, deck: forcedDeck };
+      }
+      // If no basic at all in the deck, just return what we have
+      return { hand, deck: remaining };
+    }
+  }
+
+  // Fallback (should not reach)
+  return { hand: deck.slice(0, handSize), deck: deck.slice(handSize) };
+}
+
+/**
+ * Create the initial game state. 
+ * - Shuffles both decks
+ * - Draws 5 cards per player with basic Pokemon guarantee
+ * - Does NOT auto-assign active Pokemon (players must select)
+ * - Rolls dice for turn order
+ */
 export function createInitialState(
   player1Deck: TcgCard[],
   player2Deck: TcgCard[],
@@ -76,48 +143,40 @@ export function createInitialState(
   const shuffled1 = shuffleArray(player1Deck);
   const shuffled2 = shuffleArray(player2Deck);
 
-  const p1Drawn = drawCards({ ...createEmptyPlayerState(), deck: shuffled1 }, 5);
-  const p2Drawn = drawCards({ ...createEmptyPlayerState(), deck: shuffled2 }, 5);
+  const p1Result = ensureBasicPokemonInHand(shuffled1, 5);
+  const p2Result = ensureBasicPokemonInHand(shuffled2, 5);
 
-  let p1 = p1Drawn.player;
-  let p2 = p2Drawn.player;
+  const p1: PlayerState = {
+    ...createEmptyPlayerState(),
+    hand: p1Result.hand,
+    deck: p1Result.deck,
+  };
 
-  const p1Pokemon = p1.hand.filter(isPokemonCard);
-  const p2Pokemon = p2.hand.filter(isPokemonCard);
+  const p2: PlayerState = {
+    ...createEmptyPlayerState(),
+    hand: p2Result.hand,
+    deck: p2Result.deck,
+  };
 
-  if (p1Pokemon.length > 0) {
-    const activeCard = p1Pokemon[0];
-    p1.hand = p1.hand.filter((c) => c.id !== activeCard.id);
-    p1.activeBattler = createBattler(activeCard, 'active');
-
-    const benchCards = p1.hand.filter(isPokemonCard).slice(0, 3);
-    p1.bench = benchCards
-      .map((c) => createBattler(c, 'bench'))
-      .filter((b): b is Battler => b !== null);
-    p1.hand = p1.hand.filter((c) => !p1.bench.some((b) => b.card.id === c.id));
-  }
-
-  if (p2Pokemon.length > 0) {
-    const activeCard = p2Pokemon[0];
-    p2.hand = p2.hand.filter((c) => c.id !== activeCard.id);
-    p2.activeBattler = createBattler(activeCard, 'active');
-
-    const benchCards = p2.hand.filter(isPokemonCard).slice(0, 3);
-    p2.bench = benchCards
-      .map((c) => createBattler(c, 'bench'))
-      .filter((b): b is Battler => b !== null);
-    p2.hand = p2.hand.filter((c) => !p2.bench.some((b) => b.card.id === c.id));
-  }
+  const dice = rollDice();
+  const turnOrder = [player1Id, player2Id];
+  const firstPlayer = determineFirstPlayer(dice, turnOrder);
 
   return {
     players: {
       [player1Id]: p1,
       [player2Id]: p2,
     },
-    currentTurn: player1Id,
-    turnPhase: 'draw',
+    currentTurn: firstPlayer,
+    turnPhase: 'main', // Setup phase — players select active Pokemon
     turnNumber: 1,
     winner: null,
-    turnOrder: [player1Id, player2Id],
+    turnOrder,
+    log: [
+      'Nueva partida iniciada.',
+      `Dado: ${dice} — ${dice % 2 === 0 ? 'Par' : 'Impar'} — Empieza ${firstPlayer === player1Id ? 'Jugador' : 'Rival'}.`,
+    ],
+    gamePhase: 'setup',
+    diceRoll: dice,
   };
 }

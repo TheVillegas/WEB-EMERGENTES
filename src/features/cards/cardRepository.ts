@@ -1,7 +1,9 @@
 import Papa from 'papaparse';
 import type { Card, CsvCardRow } from './types';
 import { normalizeCardRow } from './types';
-import type { Attack, EnergyType, PokemonCard, TcgCard, TrainerCard } from '../tcg-engine/types';
+import type { Attack, EnergyType, PokemonCard, TcgCard, TrainerCard } from '../../tcg-engine/types';
+import { getEvolutionStage, getEvolvesFrom } from '../../tcg-engine/evolution';
+import { getTrainerEffectText, getTrainerSubtype } from '../../tcg-engine/trainerEffects';
 
 const CATALOG_URL = '/data/pokemon_cards_gen1_img.csv';
 const STARTER_CARD_COUNT = 5;
@@ -128,8 +130,10 @@ export function toTcgCard(rows: CsvCardRow[], startIndex?: number): TcgCard[] {
       const trainer: TrainerCard = {
         id,
         name,
-        type: 'item',
-        effect: '',
+        type: getTrainerSubtype(name),
+        effect: getTrainerEffectText(name),
+        imageSmall: row.imagen_small?.trim() || '',
+        imageLarge: row.imagen_large?.trim() || '',
       };
       cards.push(trainer);
       continue;
@@ -164,6 +168,10 @@ export function toTcgCard(rows: CsvCardRow[], startIndex?: number): TcgCard[] {
       weakness: parseWeakness(row.debilidad),
       retreatCost: 1,
       isEx: false,
+      stage: getEvolutionStage(name),
+      evolvesFrom: getEvolvesFrom(name),
+      imageSmall: row.imagen_small?.trim() || '',
+      imageLarge: row.imagen_large?.trim() || '',
     };
 
     cards.push(pokemon);

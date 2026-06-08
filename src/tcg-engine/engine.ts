@@ -10,6 +10,8 @@ import type {
   ActionResult,
 } from './types';
 import { ALL_ENERGY_TYPES } from './types';
+import { canEvolveInto } from './evolution';
+import { resolveTrainerEffect } from './trainerEffects';
 
 export function getRandomEnergyType(): EnergyType {
   return ALL_ENERGY_TYPES[Math.floor(Math.random() * ALL_ENERGY_TYPES.length)];
@@ -210,6 +212,7 @@ export function attack(
 
   const newDefenderHp = defender.activeBattler.currentHp - damage;
   let updatedState = { ...state };
+  const attackLog = `${attacker.activeBattler.card.name} usó ${attackData.name} e hizo ${damage} de daño a ${defender.activeBattler.card.name}.`;
 
   if (newDefenderHp <= 0) {
     // KO
@@ -226,25 +229,46 @@ export function attack(
       discard: [...defender.discard, knockedBattler.card],
     };
 
-    // Force switch if bench available
+    const koLog = `${knockedBattler.card.name} fue derrotado. +${points} punto(s) para el atacante.`;
+
     if (defender.bench.length > 0) {
-      const newActive = defender.bench[0];
-      updatedDefender.activeBattler = { ...newActive, status: 'active' };
-      updatedDefender.bench = defender.bench.slice(1);
+      // Defender needs to choose a replacement — we set active to null
+      // The UI will handle showing the selection modal
+      updatedState = {
+        ...updatedState,
+        players: {
+          ...updatedState.players,
+          [attackerId]: updatedAttacker,
+          [defenderId]: updatedDefender,
+        },
+        turnPhase: 'end',
+        log: [...updatedState.log, attackLog, koLog, `${defenderId} debe elegir un Pokémon de la banca.`],
+      };
     } else {
       // No bench = loss
-      updatedState.winner = attackerId;
+      updatedState = {
+        ...updatedState,
+        winner: attackerId,
+        players: {
+          ...updatedState.players,
+          [attackerId]: updatedAttacker,
+          [defenderId]: updatedDefender,
+        },
+        turnPhase: 'end',
+        gamePhase: 'ended',
+        log: [...updatedState.log, attackLog, koLog, `${defenderId} no tiene Pokémon en la banca. ¡${attackerId} gana!`],
+      };
     }
 
-    updatedState = {
-      ...updatedState,
-      players: {
-        ...updatedState.players,
-        [attackerId]: updatedAttacker,
-        [defenderId]: updatedDefender,
-      },
-      turnPhase: 'end',
-    };
+    // Check points victory
+    if (updatedAttacker.points >= 3 && !updatedState.winner) {
+      updatedState = {
+        ...updatedState,
+        winner: attackerId,
+        gamePhase: 'ended',
+        log: [...updatedState.log, `${attackerId} alcanzó ${updatedAttacker.points} puntos. ¡Victoria!`],
+      };
+    }
   } else {
     const updatedDefender: PlayerState = {
       ...defender,
@@ -261,6 +285,7 @@ export function attack(
         [defenderId]: updatedDefender,
       },
       turnPhase: 'end',
+      log: [...updatedState.log, attackLog],
     };
   }
 
@@ -342,8 +367,11 @@ export function endTurn(state: GameState): GameState {
         ...state.players[currentPlayerId],
         hasAttachedEnergy: false,
         hasUsedSupporter: false,
+        hasEvolved: false,
+        hasRetreated: false,
       },
     },
+    log: [...state.log, `Turno de ${nextPlayer}.`],
   };
 
   // Generate energy for the next player (not on their first turn)
@@ -382,6 +410,7 @@ export function useTrainer(
   state: GameState,
   playerId: string,
   cardIndex: number,
+  targetInfo?: { target: 'active' | 'bench' | 'opponent-active' | 'opponent-bench'; benchIndex?: number },
 ): ActionResult {
   if (state.currentTurn !== playerId) {
     return { success: false, state: null, error: 'Not your turn' };
@@ -414,15 +443,21 @@ export function useTrainer(
     hasUsedSupporter: trainer.type === 'supporter' ? true : player.hasUsedSupporter,
   };
 
+  let updatedState: GameState = {
+    ...state,
+    players: {
+      ...state.players,
+      [playerId]: updatedPlayer,
+    },
+    log: [...state.log, `Se jugó ${trainer.name}.`],
+  };
+
+  // Resolve the actual trainer effect
+  updatedState = resolveTrainerEffect(updatedState, playerId, trainer.name, targetInfo);
+
   return {
     success: true,
-    state: {
-      ...state,
-      players: {
-        ...state.players,
-        [playerId]: updatedPlayer,
-      },
-    },
+    state: updatedState,
     error: null,
   };
 }
@@ -434,4 +469,148 @@ export function checkVictory(state: GameState): string | null {
     }
   }
   return null;
+}
+
+// ─── Evolution ───────────────────────────────────────────────────────
+
+function emptyEnergyZone(): Record<EnergyType, number> {
+  const zone = {} as Record<EnergyType, number>;
+  for (const type of ALL_ENERGY_TYPES) {
+    zone[type] = 0;
+  }
+  return zone;
+}
+
+/**
+ * Evolve a Pokemon in play using a card from the player's hand.
+ * The evolution card must be a stage1/stage2 that evolves from the target Pokemon.
+ * Energies are preserved, HP is set to the evolution's max HP.
+ */
+export function evolvePokemon(
+  state: GameState,
+  playerId: string,
+  handCardIndex: number,
+  target: 'active' | 'bench',
+  benchIndex?: number,
+): ActionResult {
+  if (state.currentTurn !== playerId) {
+    return { success: false, state: null, error: 'Not your turn' };
+  }
+  if (state.turnPhase !== 'main') {
+    return { success: false, state: null, error: 'Wrong phase' };
+  }
+
+  const player = state.players[playerId];
+
+  if (player.hasEvolved) {
+    return { success: false, state: null, error: 'Ya evolucionaste un Pok\u00e9mon este turno' };
+  }
+
+  const card = player.hand[handCardIndex];
+  if (!card || !isPokemonCard(card)) {
+    return { success: false, state: null, error: 'Invalid card' };
+  }
+
+  const pokemonCard = card as PokemonCard;
+  if (pokemonCard.stage === 'basic') {
+    return { success: false, state: null, error: 'No se puede jugar un b\u00e1sico como evoluci\u00f3n' };
+  }
+
+  let targetBattler: Battler | null = null;
+  if (target === 'active') {
+    targetBattler = player.activeBattler;
+  } else if (target === 'bench' && benchIndex !== undefined) {
+    targetBattler = player.bench[benchIndex] ?? null;
+  }
+
+  if (!targetBattler) {
+    return { success: false, state: null, error: 'Invalid target' };
+  }
+
+  // Check evolution chain
+  if (!canEvolveInto(targetBattler.card.name, pokemonCard.name)) {
+    return { success: false, state: null, error: `${pokemonCard.name} no evoluciona de ${targetBattler.card.name}` };
+  }
+
+  // Create evolved battler: keep energies, set HP to new max
+  const evolvedBattler: Battler = {
+    card: pokemonCard,
+    currentHp: pokemonCard.hp,
+    attachedEnergies: { ...targetBattler.attachedEnergies },
+    status: targetBattler.status,
+  };
+
+  const newHand = player.hand.filter((_, i) => i !== handCardIndex);
+  const updatedPlayer: PlayerState = {
+    ...player,
+    hand: newHand,
+    discard: [...player.discard, targetBattler.card], // Old card goes to discard
+    hasEvolved: true,
+  };
+
+  if (target === 'active') {
+    updatedPlayer.activeBattler = evolvedBattler;
+  } else if (benchIndex !== undefined) {
+    updatedPlayer.bench = player.bench.map((b, i) => (i === benchIndex ? evolvedBattler : b));
+  }
+
+  return {
+    success: true,
+    state: {
+      ...state,
+      players: {
+        ...state.players,
+        [playerId]: updatedPlayer,
+      },
+      log: [...state.log, `${targetBattler.card.name} evolucion\u00f3 a ${pokemonCard.name}!`],
+    },
+    error: null,
+  };
+}
+
+// ─── Forced Switch (KO) ─────────────────────────────────────────────
+
+/**
+ * Switch a bench Pokemon to active after the current active was KO'd.
+ * No retreat cost is paid.
+ */
+export function forceSwitchOnKO(
+  state: GameState,
+  playerId: string,
+  benchIndex: number,
+): ActionResult {
+  const player = state.players[playerId];
+
+  if (player.activeBattler !== null) {
+    return { success: false, state: null, error: 'Active Pokemon still alive' };
+  }
+  if (player.bench.length === 0) {
+    return { success: false, state: null, error: 'No bench Pokemon' };
+  }
+  if (benchIndex < 0 || benchIndex >= player.bench.length) {
+    return { success: false, state: null, error: 'Invalid bench index' };
+  }
+
+  const newActive = { ...player.bench[benchIndex], status: 'active' as const };
+  const newBench = [
+    ...player.bench.slice(0, benchIndex),
+    ...player.bench.slice(benchIndex + 1),
+  ];
+
+  return {
+    success: true,
+    state: {
+      ...state,
+      players: {
+        ...state.players,
+        [playerId]: {
+          ...player,
+          activeBattler: newActive,
+          bench: newBench,
+        },
+      },
+      log: [...state.log, `${newActive.card.name} entra al combate desde la banca.`],
+    },
+    error: null,
+  };
 }

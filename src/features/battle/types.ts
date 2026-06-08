@@ -1,6 +1,6 @@
 import type { Card } from '../cards/types';
 
-export type DeckType = 'Fuego' | 'Agua' | 'Planta';
+export type DeckType = 'Fuego' | 'Agua' | 'Planta' | 'Lucha' | 'Psíquico' | 'Incoloro' | 'Rayo';
 export type Difficulty = 'Fácil' | 'Normal' | 'Difícil' | '1vs1';
 
 export type TurnOwner = 'player' | 'npc';

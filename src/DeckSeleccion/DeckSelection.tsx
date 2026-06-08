@@ -3,11 +3,14 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useBattleStore } from '../features/battle/store';
 import type { DeckType } from '../features/battle/types';
+import { DECK_INFO } from '../data/defaultDecks';
 
 type DeckSelectionProps = {
   onSelect: () => void;
   onBack: () => void;
 };
+
+const ALL_DECK_TYPES: DeckType[] = ['Fuego', 'Agua', 'Planta', 'Lucha', 'Psíquico', 'Incoloro', 'Rayo'];
 
 export function DeckSelection({ onSelect, onBack }: DeckSelectionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,7 +23,7 @@ export function DeckSelection({ onSelect, onBack }: DeckSelectionProps) {
         y: 40,
         scale: 0.9,
         duration: 0.6,
-        stagger: 0.1,
+        stagger: 0.08,
         ease: 'back.out(1.4)',
       });
       gsap.from('.menu-header', { opacity: 0, y: -20, duration: 0.5, ease: 'power2.out' });
@@ -44,27 +47,24 @@ export function DeckSelection({ onSelect, onBack }: DeckSelectionProps) {
           ← Volver
         </button>
         <h2>Selecciona tu Mazo</h2>
-        <p className="eyebrow">Elige tu estilo de combate</p>
+        <p className="eyebrow">Elige tu estilo de combate — 7 tipos disponibles</p>
       </div>
 
-      <div className="deck-grid">
-        <article className="deck-card deck-card--fuego" onClick={() => handleSelectDeck('Fuego')}>
-          <div className="deck-card__icon">🔥</div>
-          <h3>Mazo Fuego</h3>
-          <p>Potencia ofensiva y daño directo. Quema a tus enemigos rápidamente.</p>
-        </article>
-
-        <article className="deck-card deck-card--agua" onClick={() => handleSelectDeck('Agua')}>
-          <div className="deck-card__icon">💧</div>
-          <h3>Mazo Agua</h3>
-          <p>Control y resistencia. Desgasta a tus oponentes con paciencia.</p>
-        </article>
-
-        <article className="deck-card deck-card--planta" onClick={() => handleSelectDeck('Planta')}>
-          <div className="deck-card__icon">🍃</div>
-          <h3>Mazo Planta</h3>
-          <p>Sinergia y curación. Mantén a tus Pokémon saludables en combate.</p>
-        </article>
+      <div className="deck-grid deck-grid--expanded">
+        {ALL_DECK_TYPES.map((deckType) => {
+          const info = DECK_INFO[deckType];
+          return (
+            <article
+              key={deckType}
+              className={`deck-card ${info.cssClass}`}
+              onClick={() => handleSelectDeck(deckType)}
+            >
+              <div className="deck-card__icon">{info.emoji}</div>
+              <h3>{info.label}</h3>
+              <p>{info.description}</p>
+            </article>
+          );
+        })}
       </div>
     </div>
   );
