@@ -767,6 +767,7 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
   font-size: clamp(32px, 5vw, 64px);
   margin-top: 8px;
   background: linear-gradient(180deg, #ffffff 0%, #a5d3ff 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -1168,6 +1169,7 @@ button.is-keyboard-focused {
 .pvp-lobby__content h2 {
   font-size: clamp(24px, 3.5vw, 40px);
   background: linear-gradient(180deg, #ffffff 0%, #c4a8ff 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
