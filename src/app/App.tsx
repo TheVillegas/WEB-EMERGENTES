@@ -277,6 +277,7 @@ export function App() {
     setCatalogError,
     initializeCatalog,
     startMatch,
+    startPvpMatch,
     selectPlayerActive,
     drawPhase,
     assignPlayerEnergy,
@@ -288,6 +289,7 @@ export function App() {
     passPlayerTurn,
     resetCurrentMatch,
     setPendingAction,
+    setPlayerName: setStorePlayerName,
     startPvpSearch,
     cancelPvpSearch,
     disconnectPvp,
@@ -642,6 +644,7 @@ export function App() {
         <NameEntry
           onConfirm={(name) => {
             setPlayerName(name);
+            setStorePlayerName(name);
             unlockAudio();
             handleNavigate('menu', name);
           }}
@@ -662,12 +665,13 @@ export function App() {
       {view === 'deck-selection' ? <DeckSelection onSelect={() => handleNavigate('difficulty-selection')} onBack={() => handleNavigate('menu')} /> : null}
 
       {view === 'difficulty-selection' ? <DifficultySelection onSelect={() => {
-        startMatch();
         const state = useBattleStore.getState();
         if (state.selectedDifficulty === '1vs1') {
-          setView('pvp-lobby');
+          // PvP: don't create match yet, go to lobby first
+          handleNavigate('pvp-lobby');
         } else {
-          setView('battle');
+          startMatch();
+          handleNavigate('battle');
         }
       }} onBack={() => setView('deck-selection')} /> : null}
 
@@ -675,8 +679,8 @@ export function App() {
         pvpStatus={pvpStatus}
         pvpMatchInfo={pvpMatchInfo}
         onSearch={startPvpSearch}
-        onCancel={() => { cancelPvpSearch(); setView('difficulty-selection'); }}
-        onStartBattle={() => setView('battle')}
+        onCancel={() => { cancelPvpSearch(); handleNavigate('difficulty-selection'); }}
+        onStartBattle={() => { startPvpMatch(); handleNavigate('battle'); }}
       /> : null}
 
       {/* Battle arena */}

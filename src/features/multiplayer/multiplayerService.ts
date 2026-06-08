@@ -12,9 +12,13 @@ export type MultiplayerCallbacks = {
   onWaiting: () => void;
   onMatched: (info: PvpMatchInfo) => void;
   onOpponentSelectActive: (data: { cardId: string; card: any }) => void;
-  onOpponentAssignEnergy: () => void;
-  onOpponentAttack: () => void;
+  onOpponentAssignEnergy: (data: { target: 'active' | 'bench'; benchIndex?: number }) => void;
+  onOpponentAttack: (data: { attackIndex: number }) => void;
   onOpponentPassTurn: () => void;
+  onOpponentPlayTrainer: (data: { cardIndex: number; targetInfo?: any }) => void;
+  onOpponentEvolve: (data: { handIndex: number; target: 'active' | 'bench'; benchIndex?: number }) => void;
+  onOpponentSwitchActive: (data: { benchIndex: number }) => void;
+  onOpponentForceSwitch: (data: { benchIndex: number }) => void;
   onOpponentDisconnected: () => void;
 };
 
@@ -91,16 +95,32 @@ export class MultiplayerService {
       this.callbacks?.onOpponentSelectActive(data);
     });
 
-    this.socket.on('pvp:opponent-assign-energy', () => {
-      this.callbacks?.onOpponentAssignEnergy();
+    this.socket.on('pvp:opponent-assign-energy', (data) => {
+      this.callbacks?.onOpponentAssignEnergy(data ?? {});
     });
 
-    this.socket.on('pvp:opponent-attack', () => {
-      this.callbacks?.onOpponentAttack();
+    this.socket.on('pvp:opponent-attack', (data) => {
+      this.callbacks?.onOpponentAttack(data ?? {});
     });
 
     this.socket.on('pvp:opponent-pass-turn', () => {
       this.callbacks?.onOpponentPassTurn();
+    });
+
+    this.socket.on('pvp:opponent-play-trainer', (data) => {
+      this.callbacks?.onOpponentPlayTrainer(data);
+    });
+
+    this.socket.on('pvp:opponent-evolve', (data) => {
+      this.callbacks?.onOpponentEvolve(data);
+    });
+
+    this.socket.on('pvp:opponent-switch-active', (data) => {
+      this.callbacks?.onOpponentSwitchActive(data);
+    });
+
+    this.socket.on('pvp:opponent-force-switch', (data) => {
+      this.callbacks?.onOpponentForceSwitch(data);
     });
 
     this.socket.on('pvp:opponent-disconnected', () => {
@@ -126,18 +146,38 @@ export class MultiplayerService {
   }
 
   /** Notify opponent that this player assigned energy */
-  emitAssignEnergy(): void {
-    this.socket?.emit('pvp:assign-energy');
+  emitAssignEnergy(target: 'active' | 'bench', benchIndex?: number): void {
+    this.socket?.emit('pvp:assign-energy', { target, benchIndex });
   }
 
   /** Notify opponent that this player attacked */
-  emitAttack(): void {
-    this.socket?.emit('pvp:attack');
+  emitAttack(attackIndex: number): void {
+    this.socket?.emit('pvp:attack', { attackIndex });
   }
 
   /** Notify opponent that this player passed their turn */
   emitPassTurn(): void {
     this.socket?.emit('pvp:pass-turn');
+  }
+
+  /** Notify opponent that this player played a trainer card */
+  emitPlayTrainer(cardIndex: number, targetInfo?: any): void {
+    this.socket?.emit('pvp:play-trainer', { cardIndex, targetInfo });
+  }
+
+  /** Notify opponent that this player evolved a Pokémon */
+  emitEvolve(handIndex: number, target: 'active' | 'bench', benchIndex?: number): void {
+    this.socket?.emit('pvp:evolve', { handIndex, target, benchIndex });
+  }
+
+  /** Notify opponent that this player switched active Pokémon */
+  emitSwitchActive(benchIndex: number): void {
+    this.socket?.emit('pvp:switch-active', { benchIndex });
+  }
+
+  /** Notify opponent that this player force-switched after KO */
+  emitForceSwitch(benchIndex: number): void {
+    this.socket?.emit('pvp:force-switch', { benchIndex });
   }
 
   /** Disconnect and clean up */

@@ -56,6 +56,7 @@ export type BattleStoreState = {
   isPvp: boolean;
   pvpMatchInfo: PvpMatchInfo | null;
   pvpStatus: 'idle' | 'searching' | 'matched' | 'disconnected';
+  playerName: string;
   // UI interaction state
   pendingAction: 'none' | 'select-attack' | 'select-trainer-target' | 'select-bench-replacement' | 'select-energy-target';
   pendingTrainerIndex: number | null;
@@ -77,7 +78,9 @@ export type BattleStoreState = {
   passPlayerTurn: () => Promise<void>;
   resetCurrentMatch: () => void;
   setPendingAction: (action: BattleStoreState['pendingAction'], trainerIndex?: number) => void;
+  setPlayerName: (name: string) => void;
   // PvP-specific actions
+  startPvpMatch: () => void;
   startPvpSearch: () => void;
   cancelPvpSearch: () => void;
   disconnectPvp: () => void;
@@ -220,6 +223,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
     isPvp: false,
     pvpMatchInfo: null,
     pvpStatus: 'idle',
+    playerName: 'Jugador',
     pendingAction: 'none',
     pendingTrainerIndex: null,
 
@@ -331,6 +335,12 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           (c) => !benchCards.some((bc) => bc.id === c.id),
         );
 
+        // In PvP: check if opponent has also selected, then transition to battle
+        const opponentHasActive = Boolean(state.tcgState.players[state.opponentId]?.activeBattler);
+        const nextGamePhase = state.isPvp
+          ? (opponentHasActive ? 'battle' : 'setup')
+          : 'battle';
+
         const updatedTcgState: TcgGameState = {
           ...state.tcgState,
           players: {
@@ -342,7 +352,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
               bench,
             },
           },
-          gamePhase: 'battle',
+          gamePhase: nextGamePhase,
           log: [
             ...state.tcgState.log,
             `Elegiste a ${pokemonCard.name} como Pokémon activo.`,
@@ -351,6 +361,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
               : []),
           ],
         };
+
+        // Emit to opponent in PvP
+        if (state.isPvp) {
+          multiplayerService.emitSelectActive(cardId, pokemonCard);
+        }
 
         return {
           tcgState: updatedTcgState,
@@ -376,6 +391,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const result = attachEnergy(state.tcgState, state.playerId, target, benchIndex);
         if (!result.success || !result.state) return {};
 
+        // Emit to opponent in PvP
+        if (state.isPvp) {
+          multiplayerService.emitAssignEnergy(target, benchIndex);
+        }
+
         return {
           tcgState: result.state,
           match: syncLegacyState(result.state, state.playerId, state.opponentId, state.catalog, state.matchCounter),
@@ -391,13 +411,20 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
 
       let tcgState = result.state;
 
-      // Check if opponent needs to force switch after KO
-      const opponent = tcgState.players[state.opponentId];
-      if (!opponent.activeBattler && opponent.bench.length > 0) {
-        // NPC auto-selects first bench Pokemon
-        const switchResult = forceSwitchOnKO(tcgState, state.opponentId, 0);
-        if (switchResult.success && switchResult.state) {
-          tcgState = switchResult.state;
+      // Emit to opponent in PvP
+      if (state.isPvp) {
+        multiplayerService.emitAttack(attackIndex);
+      }
+
+      // Check if opponent needs to force switch after KO (NPC only)
+      if (!state.isPvp) {
+        const opponent = tcgState.players[state.opponentId];
+        if (!opponent.activeBattler && opponent.bench.length > 0) {
+          // NPC auto-selects first bench Pokemon
+          const switchResult = forceSwitchOnKO(tcgState, state.opponentId, 0);
+          if (switchResult.success && switchResult.state) {
+            tcgState = switchResult.state;
+          }
         }
       }
 
@@ -422,8 +449,8 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         pendingAction: 'none',
       }));
 
-      // NPC turn
-      if (!tcgState.winner && tcgState.currentTurn === state.opponentId) {
+      // NPC turn (skip in PvP — opponent plays on their own client)
+      if (!state.isPvp && !tcgState.winner && tcgState.currentTurn === state.opponentId) {
         await resolveNpcTurn(tcgState, state.opponentId, state.playerId, set, get);
       }
     },
@@ -449,6 +476,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const result = useTrainer(state.tcgState, state.playerId, cardIndex, targetInfo);
         if (!result.success || !result.state) return {};
 
+        // Emit to opponent in PvP
+        if (state.isPvp) {
+          multiplayerService.emitPlayTrainer(cardIndex, targetInfo);
+        }
+
         return {
           tcgState: result.state,
           match: syncLegacyState(result.state, state.playerId, state.opponentId, state.catalog, state.matchCounter),
@@ -463,6 +495,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const result = evolvePokemon(state.tcgState, state.playerId, handIndex, target, benchIndex);
         if (!result.success || !result.state) return {};
 
+        // Emit to opponent in PvP
+        if (state.isPvp) {
+          multiplayerService.emitEvolve(handIndex, target, benchIndex);
+        }
+
         return {
           tcgState: result.state,
           match: syncLegacyState(result.state, state.playerId, state.opponentId, state.catalog, state.matchCounter),
@@ -474,6 +511,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         if (!state.tcgState) return {};
         const result = switchActive(state.tcgState, state.playerId, benchIndex);
         if (!result.success || !result.state) return {};
+
+        // Emit to opponent in PvP
+        if (state.isPvp) {
+          multiplayerService.emitSwitchActive(benchIndex);
+        }
 
         return {
           tcgState: result.state,
@@ -487,6 +529,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const result = forceSwitchOnKO(state.tcgState, state.playerId, benchIndex);
         if (!result.success || !result.state) return {};
 
+        // Emit to opponent in PvP
+        if (state.isPvp) {
+          multiplayerService.emitForceSwitch(benchIndex);
+        }
+
         return {
           tcgState: result.state,
           match: syncLegacyState(result.state, state.playerId, state.opponentId, state.catalog, state.matchCounter),
@@ -498,6 +545,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
       const state = get();
       if (!state.tcgState) return;
 
+      // Emit to opponent in PvP
+      if (state.isPvp) {
+        multiplayerService.emitPassTurn();
+      }
+
       let tcgState = endTurn(state.tcgState);
 
       set(() => ({
@@ -505,8 +557,8 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
       }));
 
-      // NPC turn
-      if (tcgState.currentTurn === state.opponentId) {
+      // NPC turn (skip in PvP — opponent plays on their own client)
+      if (!state.isPvp && tcgState.currentTurn === state.opponentId) {
         await resolveNpcTurn(tcgState, state.opponentId, state.playerId, set, get);
       }
     },
@@ -526,17 +578,242 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         pendingTrainerIndex: trainerIndex ?? null,
       })),
 
-    // --- PvP-specific actions (simplified — keeping structure, will need tcg-engine migration later) ---
+    setPlayerName: (name) => set(() => ({ playerName: name })),
+
+    // --- PvP-specific actions ---
+
+    startPvpMatch: () =>
+      set((state) => {
+        const deckType = state.selectedDeck || 'Fuego';
+        const playerDeck = getDeckByType(deckType, state.tcgCatalog);
+        // In PvP both players build their own decks locally
+        // The opponent's deck is also generated locally (same catalog, random different type)
+        const allTypes: DeckType[] = ['Fuego', 'Agua', 'Planta', 'Lucha', 'Psíquico', 'Incoloro', 'Rayo'];
+        const opponentTypes = allTypes.filter((t) => t !== deckType);
+        const opponentDeckType = opponentTypes[Math.floor(Math.random() * opponentTypes.length)];
+        const opponentDeck = getDeckByType(opponentDeckType, state.tcgCatalog);
+
+        const pvpPlayerId = 'player';
+        const pvpOpponentId = 'opponent';
+        const newMatchCounter = state.matchCounter + 1;
+
+        const tcgState = createInitialState(playerDeck, opponentDeck, pvpPlayerId, pvpOpponentId);
+
+        // In PvP: do NOT auto-select active for opponent (they select on their client)
+        return {
+          isPvp: true,
+          tcgState,
+          playerId: pvpPlayerId,
+          opponentId: pvpOpponentId,
+          matchCounter: newMatchCounter,
+          match: syncLegacyState(tcgState, pvpPlayerId, pvpOpponentId, state.catalog, newMatchCounter),
+          pendingAction: 'none',
+        };
+      }),
+
     startPvpSearch: () => {
       const currentStatus = get().pvpStatus;
       if (currentStatus === 'searching' || currentStatus === 'matched') {
         return;
       }
+
       set(() => ({ pvpStatus: 'searching' }));
-      // PvP search logic would go here — temporarily disabled during migration
+
+      multiplayerService.connect({
+        onWaiting: () => {
+          set(() => ({ pvpStatus: 'searching' }));
+        },
+        onMatched: (info: PvpMatchInfo) => {
+          set(() => ({
+            pvpStatus: 'matched',
+            pvpMatchInfo: info,
+          }));
+        },
+        onOpponentSelectActive: (data) => {
+          // The opponent selected their active card — update opponent slot
+          const state = get();
+          if (!state.tcgState) return;
+
+          const opponentCard = data.card as PokemonCard;
+          const opponentBattler = createBattler(opponentCard, 'active');
+          const opponentPlayer = state.tcgState.players[state.opponentId];
+
+          // Put remaining basics on opponent bench
+          const remainingHand = opponentPlayer.hand.filter((c) => c.id !== opponentCard.id);
+          const benchCards = remainingHand
+            .filter((c) => isPokemonCard(c) && isBasicPokemon(c))
+            .slice(0, 3) as PokemonCard[];
+          const bench = benchCards.map((c) => createBattler(c, 'bench'));
+          const finalHand = remainingHand.filter(
+            (c) => !benchCards.some((bc) => bc.id === c.id),
+          );
+
+          // Check if our player also has an active — if so, transition to battle
+          const ourActive = Boolean(state.tcgState.players[state.playerId]?.activeBattler);
+          const nextGamePhase = ourActive ? 'battle' : 'setup';
+
+          const updatedTcgState: TcgGameState = {
+            ...state.tcgState,
+            players: {
+              ...state.tcgState.players,
+              [state.opponentId]: {
+                ...opponentPlayer,
+                hand: finalHand,
+                activeBattler: opponentBattler,
+                bench,
+              },
+            },
+            gamePhase: nextGamePhase,
+            log: [
+              ...state.tcgState.log,
+              `${state.pvpMatchInfo?.opponentName || 'Rival'} activó a ${opponentCard.name}.`,
+              ...(benchCards.length > 0
+                ? [`Rival puso ${benchCards.map((c) => c.name).join(', ')} en la banca.`]
+                : []),
+            ],
+          };
+
+          set(() => ({
+            tcgState: updatedTcgState,
+            match: syncLegacyState(updatedTcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+        onOpponentAssignEnergy: (data) => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          const result = attachEnergy(state.tcgState, state.opponentId, data.target || 'active', data.benchIndex);
+          if (!result.success || !result.state) return;
+
+          set(() => ({
+            tcgState: result.state!,
+            match: syncLegacyState(result.state!, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+        onOpponentAttack: (data) => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          const result = attack(state.tcgState, state.opponentId, data.attackIndex ?? 0);
+          if (!result.success || !result.state) return;
+
+          let tcgState = result.state;
+
+          // Check victory
+          const winner = checkVictory(tcgState);
+          if (winner) {
+            tcgState = {
+              ...tcgState,
+              winner,
+              gamePhase: 'ended',
+            };
+          }
+
+          // End turn if no KO that requires our force-switch
+          const myPlayer = tcgState.players[state.playerId];
+          const needsForceSwitch = !myPlayer.activeBattler && myPlayer.bench.length > 0;
+
+          if (!tcgState.winner && !needsForceSwitch) {
+            tcgState = endTurn(tcgState);
+          }
+
+          set(() => ({
+            tcgState,
+            match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+            pendingAction: needsForceSwitch ? 'select-bench-replacement' : 'none',
+          }));
+        },
+        onOpponentPassTurn: () => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          let tcgState = endTurn(state.tcgState);
+
+          set(() => ({
+            tcgState,
+            match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+        onOpponentPlayTrainer: (data) => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          const result = useTrainer(state.tcgState, state.opponentId, data.cardIndex, data.targetInfo);
+          if (!result.success || !result.state) return;
+
+          set(() => ({
+            tcgState: result.state!,
+            match: syncLegacyState(result.state!, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+        onOpponentEvolve: (data) => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          const result = evolvePokemon(state.tcgState, state.opponentId, data.handIndex, data.target, data.benchIndex);
+          if (!result.success || !result.state) return;
+
+          set(() => ({
+            tcgState: result.state!,
+            match: syncLegacyState(result.state!, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+        onOpponentSwitchActive: (data) => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          const result = switchActive(state.tcgState, state.opponentId, data.benchIndex);
+          if (!result.success || !result.state) return;
+
+          set(() => ({
+            tcgState: result.state!,
+            match: syncLegacyState(result.state!, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+        onOpponentForceSwitch: (data) => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          const result = forceSwitchOnKO(state.tcgState, state.opponentId, data.benchIndex);
+          if (!result.success || !result.state) return;
+
+          let tcgState = result.state;
+
+          // After opponent force-switches, end their turn if it was pending
+          if (tcgState.currentTurn === state.opponentId && !tcgState.winner) {
+            tcgState = endTurn(tcgState);
+          }
+
+          set(() => ({
+            tcgState,
+            match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+        onOpponentDisconnected: () => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          const updatedTcgState: TcgGameState = {
+            ...state.tcgState,
+            winner: state.playerId,
+            gamePhase: 'ended',
+            log: [...state.tcgState.log, 'El oponente se ha desconectado. ¡Victoria!'],
+          };
+
+          set(() => ({
+            pvpStatus: 'disconnected',
+            tcgState: updatedTcgState,
+            match: syncLegacyState(updatedTcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
+      });
+
+      multiplayerService.joinQueue(get().playerName);
     },
 
     cancelPvpSearch: () => {
+      multiplayerService.cancelQueue();
+      multiplayerService.disconnect();
       set(() => ({
         pvpStatus: 'idle',
         pvpMatchInfo: null,
@@ -545,6 +822,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
     },
 
     disconnectPvp: () => {
+      multiplayerService.disconnect();
       set(() => ({
         pvpStatus: 'idle',
         pvpMatchInfo: null,

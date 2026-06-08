@@ -76,17 +76,17 @@ io.on('connection', (socket) => {
   });
 
   // --- Relay: player assigned energy ---
-  socket.on('pvp:assign-energy', () => {
+  socket.on('pvp:assign-energy', (data) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
-    socket.to(roomId).emit('pvp:opponent-assign-energy');
+    socket.to(roomId).emit('pvp:opponent-assign-energy', data);
   });
 
   // --- Relay: player attacked ---
-  socket.on('pvp:attack', () => {
+  socket.on('pvp:attack', (data) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
-    socket.to(roomId).emit('pvp:opponent-attack');
+    socket.to(roomId).emit('pvp:opponent-attack', data);
   });
 
   // --- Relay: player passed turn ---
@@ -94,6 +94,34 @@ io.on('connection', (socket) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
     socket.to(roomId).emit('pvp:opponent-pass-turn');
+  });
+
+  // --- Relay: player played a trainer card ---
+  socket.on('pvp:play-trainer', (data) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    socket.to(roomId).emit('pvp:opponent-play-trainer', data);
+  });
+
+  // --- Relay: player evolved a Pokémon ---
+  socket.on('pvp:evolve', (data) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    socket.to(roomId).emit('pvp:opponent-evolve', data);
+  });
+
+  // --- Relay: player switched active Pokémon ---
+  socket.on('pvp:switch-active', (data) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    socket.to(roomId).emit('pvp:opponent-switch-active', data);
+  });
+
+  // --- Relay: player force-switched after KO ---
+  socket.on('pvp:force-switch', (data) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    socket.to(roomId).emit('pvp:opponent-force-switch', data);
   });
 
   // --- Relay: player selected their deck ---
