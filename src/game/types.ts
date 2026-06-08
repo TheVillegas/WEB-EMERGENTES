@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import type { Battler } from '../features/battle/types';
 import type { Card } from '../features/cards/types';
 
+/**
+ * Legacy Battler and Card types are used by the 3D scene.
+ * The stateAdapter converts from tcg-engine types to these legacy types.
+ */
+
 export interface BattleSceneController {
   resize(): void;
   dispose(): void;
