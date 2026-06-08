@@ -61,10 +61,12 @@ export function Tutorial({ onBack }: TutorialProps) {
         <section className="tutorial-section">
           <h3>⚔️ Dinámica del Juego</h3>
           <ul className="tutorial-rules">
-            <li><strong>Activar Pokémon:</strong> Al inicio o si tu Pokémon activo es derrotado, selecciona una carta de tu mano con las flechas y presiona <code>Enter</code> para ponerlo en el campo.</li>
-            <li><strong>Asignar Energía:</strong> Puedes asignar 1 punto de energía por turno a tu Pokémon activo desde la barra de acciones.</li>
-            <li><strong>Atacar:</strong> Una vez que tu Pokémon activo tenga cargada la energía requerida (costo), puedes realizar un ataque para infligir daño al Pokémon rival.</li>
-            <li><strong>Pasar Turno:</strong> Finaliza tu turno para ceder la acción al NPC enemigo.</li>
+            <li><strong>Banca y Activo:</strong> Mantén 1 Pokémon activo y hasta 3 básicos en la banca. Si tu activo es derrotado, debes elegir un reemplazo.</li>
+            <li><strong>Asignar Energía:</strong> Una vez por turno, asigna 1 energía a tu Pokémon activo o a uno de la banca.</li>
+            <li><strong>Evolución:</strong> Juega cartas de evolución desde tu mano para evolucionar a tus Pokémon en juego.</li>
+            <li><strong>Cartas de Entrenador:</strong> Usa cartas de entrenador desde tu mano para obtener efectos estratégicos (curar, robar, buscar cartas, etc).</li>
+            <li><strong>Retirada:</strong> Descarta la energía de costo de retirada de tu activo para cambiarlo por un Pokémon de la banca.</li>
+            <li><strong>Atacar o Pasar:</strong> Ataca al rival si tienes la energía requerida. Atacar o elegir la acción "Pasar Turno" terminará tu turno (contra NPC o Jugador real).</li>
           </ul>
         </section>
       </div>
