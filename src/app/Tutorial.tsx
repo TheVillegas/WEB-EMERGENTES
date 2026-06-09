@@ -39,34 +39,54 @@ export function Tutorial({ onBack }: TutorialProps) {
 
       <div className="tutorial-container">
         <section className="tutorial-section">
-          <h3>🎮 Navegación y Controles</h3>
+          <h3>🏆 Objetivo del Juego</h3>
+          <p style={{ color: 'var(--muted)', lineHeight: 1.6, marginTop: '8px' }}>
+            El Pokémon TCG es un juego de batallas por turnos. 
+            El objetivo es derrotar a los Pokémon del oponente usando los ataques de tus propios Pokémon. 
+            Ganas la partida si logras vencer al <strong>Pokémon Activo</strong> de tu rival y este no tiene ningún otro Pokémon en su <strong>Banca</strong> para reemplazarlo.
+          </p>
+        </section>
+
+        <section className="tutorial-section">
+          <h3>🃏 Tipos de Cartas</h3>
+          <ul className="tutorial-rules">
+            <li><strong>Pokémon Básicos:</strong> Son los que pelean. Puedes jugarlos directamente al campo (al puesto Activo o a la Banca). Tienen Puntos de Salud (HP) y Ataques.</li>
+            <li><strong>Pokémon Evolución (Fase 1 y Fase 2):</strong> Se juegan encima de un Pokémon de fase previa compatible que ya esté en el campo para hacerlo más poderoso.</li>
+            <li><strong>Cartas de Energía:</strong> Son el "combustible". Debes asignarlas a tus Pokémon para que puedan pagar el costo de sus ataques o el costo de su retirada.</li>
+            <li><strong>Cartas de Entrenador:</strong> Son objetos, personajes o lugares que usas desde tu mano para ganar una ventaja táctica (por ejemplo: curar a un Pokémon o robar cartas de tu mazo).</li>
+          </ul>
+        </section>
+
+        <section className="tutorial-section">
+          <h3>🎮 Cómo Interactuar</h3>
+          <p style={{ color: 'var(--muted)', lineHeight: 1.6, margin: '8px 0 16px' }}>
+            El juego usa un sistema de selección visual para que puedas jugar cómodamente:
+          </p>
           <div className="tutorial-grid">
             <div className="tutorial-item">
               <span className="key-badge">←</span>
               <span className="key-badge">→</span>
-              <p>Moverse entre las cartas de tu mano o las acciones de la barra inferior.</p>
+              <p>Moverte de izquierda a derecha entre las cartas de tu mano o las opciones.</p>
             </div>
             <div className="tutorial-item">
               <span className="key-badge">↑</span>
               <span className="key-badge">↓</span>
-              <p>Alternar el foco entre tu Mano (abajo) y la Barra de Acciones (arriba).</p>
+              <p>Moverte de arriba hacia abajo (ej. pasar de tu mano a la barra superior de acciones).</p>
             </div>
             <div className="tutorial-item">
               <span className="key-badge">Enter</span>
-              <p>Seleccionar o activar la carta/acción que tiene el foco actual.</p>
+              <p>Activar la carta o acción resaltada. Si la carta requiere un objetivo (ej: a quién darle energía o sobre quién evolucionar), la interfaz te pedirá seleccionarlo y confirmar.</p>
             </div>
           </div>
         </section>
 
         <section className="tutorial-section">
-          <h3>⚔️ Dinámica del Juego</h3>
+          <h3>⚔️ El Turno y la Batalla</h3>
           <ul className="tutorial-rules">
-            <li><strong>Banca y Activo:</strong> Mantén 1 Pokémon activo y hasta 3 básicos en la banca. Si tu activo es derrotado, debes elegir un reemplazo.</li>
-            <li><strong>Asignar Energía:</strong> Una vez por turno, asigna 1 energía a tu Pokémon activo o a uno de la banca.</li>
-            <li><strong>Evolución:</strong> Juega cartas de evolución desde tu mano para evolucionar a tus Pokémon en juego.</li>
-            <li><strong>Cartas de Entrenador:</strong> Usa cartas de entrenador desde tu mano para obtener efectos estratégicos (curar, robar, buscar cartas, etc).</li>
-            <li><strong>Retirada:</strong> Descarta la energía de costo de retirada de tu activo para cambiarlo por un Pokémon de la banca.</li>
-            <li><strong>Atacar o Pasar:</strong> Ataca al rival si tienes la energía requerida. Atacar o elegir la acción "Pasar Turno" terminará tu turno (contra NPC o Jugador real).</li>
+            <li><strong>Zonas:</strong> Tienes un <strong>Pokémon Activo</strong> (el que ataca y recibe daño) y hasta 3 Pokémon en tu <strong>Banca</strong> (esperando en la retaguardia).</li>
+            <li><strong>Acciones de Turno:</strong> Durante tu turno, puedes jugar Cartas de Entrenador, evolucionar Pokémon, jugar Pokémon básicos a la banca, y <strong>asignar exactamente 1 carta de Energía</strong> a cualquiera de tus Pokémon.</li>
+            <li><strong>Retirada:</strong> Si tu Pokémon Activo está en peligro, puedes usar la acción de Retirada. Deberás descartar la cantidad de energía que pide su costo para cambiarlo por uno de la banca.</li>
+            <li><strong>Atacar:</strong> Si tu Pokémon Activo tiene la energía suficiente, selecciona la acción de Atacar para hacerle daño al rival. ¡Ten en cuenta que <strong>atacar termina tu turno automáticamente</strong>!</li>
           </ul>
         </section>
       </div>
