@@ -27,6 +27,7 @@ io.on('connection', (socket) => {
       // Match found — create a room
       roomCounter += 1;
       const roomId = `pvp-room-${roomCounter}`;
+      const diceRoll = Math.floor(Math.random() * 6) + 1;
 
       waitingPlayer.join(roomId);
       socket.join(roomId);
@@ -43,12 +44,14 @@ io.on('connection', (socket) => {
         roomId,
         role: 'player1',
         opponentName: socket.data.playerName,
+        diceRoll,
       });
 
       socket.emit('pvp:matched', {
         roomId,
         role: 'player2',
         opponentName: waitingPlayer.data.playerName,
+        diceRoll,
       });
 
       waitingPlayer = null;

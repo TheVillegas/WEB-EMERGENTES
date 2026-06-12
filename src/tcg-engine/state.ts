@@ -139,6 +139,8 @@ export function createInitialState(
   player2Deck: TcgCard[],
   player1Id: string,
   player2Id: string,
+  preRolledDice?: number,
+  pvpRole?: 'player1' | 'player2',
 ): GameState {
   const shuffled1 = shuffleArray(player1Deck);
   const shuffled2 = shuffleArray(player2Deck);
@@ -158,8 +160,11 @@ export function createInitialState(
     deck: p2Result.deck,
   };
 
-  const dice = rollDice();
-  const turnOrder = [player1Id, player2Id];
+  const dice = preRolledDice ?? rollDice();
+  
+  // Si somos el Jugador 2 en PvP, invertimos el orden para que los turnos 
+  // sincronicen con el Jugador 1 local.
+  const turnOrder = pvpRole === 'player2' ? [player2Id, player1Id] : [player1Id, player2Id];
   const firstPlayer = determineFirstPlayer(dice, turnOrder);
 
   return {

@@ -795,8 +795,11 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const pvpPlayerId = 'player';
         const pvpOpponentId = 'opponent';
         const newMatchCounter = state.matchCounter + 1;
+        
+        const serverDice = state.pvpMatchInfo?.diceRoll;
+        const pvpRole = state.pvpMatchInfo?.role;
 
-        const tcgState = createInitialState(playerDeck, opponentDeck, pvpPlayerId, pvpOpponentId);
+        const tcgState = createInitialState(playerDeck, opponentDeck, pvpPlayerId, pvpOpponentId, serverDice, pvpRole);
 
         // In PvP: do NOT auto-select active for opponent (they select on their client)
         return {

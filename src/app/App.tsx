@@ -765,7 +765,7 @@ export function App() {
                   <div className="dice-overlay__dice">🎲</div>
                   <h2 className="dice-overlay__result">{tcgState.diceRoll}</h2>
                   <p className="dice-overlay__label">
-                    {tcgState.diceRoll % 2 === 0 ? '¡Par! Empiezas tú' : '¡Impar! Empieza el rival'}
+                    {tcgState.currentTurn === playerId ? '¡Empiezas tú!' : '¡Comienza el otro jugador!'}
                   </p>
                 </div>
               </div>
