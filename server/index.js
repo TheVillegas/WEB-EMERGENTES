@@ -38,17 +38,23 @@ io.on('connection', (socket) => {
 
       console.log(`[PvP] Sala creada: ${roomId} → ${waitingPlayer.data.playerName} vs ${socket.data.playerName}`);
 
+      // Roll a single shared dice for turn order (1-6)
+      const diceRoll = Math.floor(Math.random() * 6) + 1;
+      console.log(`[PvP] Dado compartido: ${diceRoll} → Empieza ${diceRoll % 2 === 0 ? 'Jugador 1' : 'Jugador 2'}`);
+
       // Notify both players
       waitingPlayer.emit('pvp:matched', {
         roomId,
         role: 'player1',
         opponentName: socket.data.playerName,
+        diceRoll,
       });
 
       socket.emit('pvp:matched', {
         roomId,
         role: 'player2',
         opponentName: waitingPlayer.data.playerName,
+        diceRoll,
       });
 
       waitingPlayer = null;

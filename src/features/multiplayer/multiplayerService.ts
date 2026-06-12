@@ -6,6 +6,7 @@ export type PvpMatchInfo = {
   roomId: string;
   role: PvpRole;
   opponentName: string;
+  diceRoll: number;
 };
 
 export type MultiplayerCallbacks = {
