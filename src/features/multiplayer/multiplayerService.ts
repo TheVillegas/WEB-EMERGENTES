@@ -17,6 +17,7 @@ export type MultiplayerCallbacks = {
   onOpponentAssignEnergy: (data: { target: 'active' | 'bench'; benchIndex?: number }) => void;
   onOpponentAttack: (data: { attackIndex: number }) => void;
   onOpponentPassTurn: () => void;
+  onOpponentDrawPhase: () => void;
   onOpponentPlayTrainer: (data: { cardIndex: number; targetInfo?: any }) => void;
   onOpponentEvolve: (data: { handIndex: number; target: 'active' | 'bench'; benchIndex?: number }) => void;
   onOpponentSwitchActive: (data: { benchIndex: number }) => void;
@@ -113,6 +114,10 @@ export class MultiplayerService {
       this.callbacks?.onOpponentPassTurn();
     });
 
+    this.socket.on('pvp:opponent-draw-phase', () => {
+      this.callbacks?.onOpponentDrawPhase();
+    });
+
     this.socket.on('pvp:opponent-play-trainer', (data) => {
       this.callbacks?.onOpponentPlayTrainer(data);
     });
@@ -169,6 +174,11 @@ export class MultiplayerService {
   /** Notify opponent that this player passed their turn */
   emitPassTurn(): void {
     this.socket?.emit('pvp:pass-turn');
+  }
+
+  /** Notify opponent that this player drew a card starting their turn */
+  emitDrawPhase(): void {
+    this.socket?.emit('pvp:draw-phase');
   }
 
   /** Notify opponent that this player played a trainer card */

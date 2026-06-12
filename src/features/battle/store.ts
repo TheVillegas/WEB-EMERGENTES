@@ -528,6 +528,10 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         let tcgState = drawCard(state.tcgState, state.playerId);
         tcgState = { ...tcgState, turnPhase: 'main' };
 
+        if (state.isPvp) {
+          multiplayerService.emitDrawPhase();
+        }
+
         return {
           tcgState,
           match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
@@ -587,8 +591,12 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         };
       }
 
+      // Check if opponent needs to force switch after KO
+      const opponent = tcgState.players[state.opponentId];
+      const needsForceSwitch = !opponent.activeBattler && opponent.bench.length > 0;
+
       // End turn
-      if (!tcgState.winner) {
+      if (!tcgState.winner && !needsForceSwitch) {
         tcgState = endTurn(tcgState);
       }
 
@@ -695,14 +703,20 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const result = forceSwitchOnKO(state.tcgState, state.playerId, benchIndex);
         if (!result.success || !result.state) return {};
 
+        let tcgState = result.state;
+
         // Emit to opponent in PvP
         if (state.isPvp) {
           multiplayerService.emitForceSwitch(benchIndex);
         }
 
+        if (tcgState.turnPhase === 'end') {
+          tcgState = endTurn(tcgState);
+        }
+
         return {
-          tcgState: result.state,
-          match: syncLegacyState(result.state, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          tcgState,
+          match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
           pendingAction: 'none',
         };
       }),
@@ -957,6 +971,18 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
             match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
           }));
         },
+        onOpponentDrawPhase: () => {
+          const state = get();
+          if (!state.tcgState) return;
+
+          let tcgState = drawCard(state.tcgState, state.opponentId);
+          tcgState = { ...tcgState, turnPhase: 'main' };
+
+          set(() => ({
+            tcgState,
+            match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          }));
+        },
         onOpponentPlayTrainer: (data) => {
           const state = get();
           if (!state.tcgState) return;
@@ -1002,8 +1028,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
 
           let tcgState = result.state;
 
-          // After opponent force-switches, end their turn if it was pending
-          if (tcgState.currentTurn === state.opponentId && !tcgState.winner) {
+          if (tcgState.turnPhase === 'end') {
             tcgState = endTurn(tcgState);
           }
 

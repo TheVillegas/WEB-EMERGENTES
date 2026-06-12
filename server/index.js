@@ -106,6 +106,13 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('pvp:opponent-pass-turn');
   });
 
+  // --- Relay: player drew a card (start of turn phase) ---
+  socket.on('pvp:draw-phase', () => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    socket.to(roomId).emit('pvp:opponent-draw-phase');
+  });
+
   // --- Relay: player played a trainer card ---
   socket.on('pvp:play-trainer', (data) => {
     const roomId = socket.data.roomId;
