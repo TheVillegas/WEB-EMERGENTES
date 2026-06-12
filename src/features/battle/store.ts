@@ -587,8 +587,13 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         };
       }
 
-      // End turn
-      if (!tcgState.winner) {
+      // End turn — in PvP, skip if opponent needs to force-switch after KO
+      // (the turn will end when we receive their force-switch event)
+      const opponentNeedsForceSwitch = state.isPvp &&
+        !tcgState.players[state.opponentId].activeBattler &&
+        tcgState.players[state.opponentId].bench.length > 0;
+
+      if (!tcgState.winner && !opponentNeedsForceSwitch) {
         tcgState = endTurn(tcgState);
       }
 
@@ -700,9 +705,17 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           multiplayerService.emitForceSwitch(benchIndex);
         }
 
+        // In PvP, the attacker deferred endTurn() while waiting for us to
+        // pick a replacement.  Now that we have, end the turn on our side
+        // so that currentTurn switches to us (the defender).
+        let tcgState = result.state;
+        if (state.isPvp && !tcgState.winner) {
+          tcgState = endTurn(tcgState);
+        }
+
         return {
-          tcgState: result.state,
-          match: syncLegacyState(result.state, state.playerId, state.opponentId, state.catalog, state.matchCounter),
+          tcgState,
+          match: syncLegacyState(tcgState, state.playerId, state.opponentId, state.catalog, state.matchCounter),
           pendingAction: 'none',
         };
       }),
@@ -797,8 +810,14 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const newMatchCounter = state.matchCounter + 1;
 
         // Use the shared dice roll from the server so both clients get the same turn order
-        const serverDiceRoll = state.pvpMatchInfo?.diceRoll;
+        const serverDiceRoll = state.pvpMatchInfo?.diceRoll || 1;
         const tcgState = createInitialState(playerDeck, opponentDeck, pvpPlayerId, pvpOpponentId, serverDiceRoll);
+
+        const myRole = state.pvpMatchInfo?.role; // 'player1' or 'player2'
+        const p1Starts = serverDiceRoll % 2 === 0;
+        const iStart = (myRole === 'player1' && p1Starts) || (myRole === 'player2' && !p1Starts);
+        
+        tcgState.currentTurn = iStart ? pvpPlayerId : pvpOpponentId;
 
         // In PvP: do NOT auto-select active for opponent (they select on their client)
         return {
@@ -904,7 +923,13 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           const state = get();
           if (!state.tcgState) return;
 
-          const result = attachEnergy(state.tcgState, state.opponentId, data.target || 'active', data.benchIndex);
+          // Advance turnPhase if still in 'draw' on this client
+          let preState = state.tcgState;
+          if (preState.turnPhase === 'draw') {
+            preState = { ...preState, turnPhase: 'main' };
+          }
+
+          const result = attachEnergy(preState, state.opponentId, data.target || 'active', data.benchIndex);
           if (!result.success || !result.state) return;
 
           set(() => ({
@@ -916,7 +941,15 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           const state = get();
           if (!state.tcgState) return;
 
-          const result = attack(state.tcgState, state.opponentId, data.attackIndex ?? 0);
+          // Advance turnPhase to 'main' if still in 'draw' — the auto-draw
+          // effect only runs on the active player's client, so the receiving
+          // client may still be in 'draw' phase which causes attack() to fail.
+          let preState = state.tcgState;
+          if (preState.turnPhase === 'draw') {
+            preState = { ...preState, turnPhase: 'main' };
+          }
+
+          const result = attack(preState, state.opponentId, data.attackIndex ?? 0);
           if (!result.success || !result.state) return;
 
           let tcgState = result.state;
@@ -960,7 +993,13 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           const state = get();
           if (!state.tcgState) return;
 
-          const result = useTrainer(state.tcgState, state.opponentId, data.cardIndex, data.targetInfo);
+          // Advance turnPhase if still in 'draw' on this client
+          let preState = state.tcgState;
+          if (preState.turnPhase === 'draw') {
+            preState = { ...preState, turnPhase: 'main' };
+          }
+
+          const result = useTrainer(preState, state.opponentId, data.cardIndex, data.targetInfo);
           if (!result.success || !result.state) return;
 
           set(() => ({
@@ -972,7 +1011,13 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           const state = get();
           if (!state.tcgState) return;
 
-          const result = evolvePokemon(state.tcgState, state.opponentId, data.handIndex, data.target, data.benchIndex);
+          // Advance turnPhase if still in 'draw' on this client
+          let preState = state.tcgState;
+          if (preState.turnPhase === 'draw') {
+            preState = { ...preState, turnPhase: 'main' };
+          }
+
+          const result = evolvePokemon(preState, state.opponentId, data.handIndex, data.target, data.benchIndex);
           if (!result.success || !result.state) return;
 
           set(() => ({
@@ -984,7 +1029,13 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           const state = get();
           if (!state.tcgState) return;
 
-          const result = switchActive(state.tcgState, state.opponentId, data.benchIndex);
+          // Advance turnPhase if still in 'draw' on this client
+          let preState = state.tcgState;
+          if (preState.turnPhase === 'draw') {
+            preState = { ...preState, turnPhase: 'main' };
+          }
+
+          const result = switchActive(preState, state.opponentId, data.benchIndex);
           if (!result.success || !result.state) return;
 
           set(() => ({
@@ -1001,8 +1052,10 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
 
           let tcgState = result.state;
 
-          // After opponent force-switches, end their turn if it was pending
-          if (tcgState.currentTurn === state.opponentId && !tcgState.winner) {
+          // After opponent force-switches, end the attacker's turn.
+          // The attacker (us) deferred endTurn until the opponent selected
+          // a replacement, so we need to end the turn now.
+          if (!tcgState.winner) {
             tcgState = endTurn(tcgState);
           }
 
