@@ -132,13 +132,14 @@ function ensureBasicPokemonInHand(
  * - Shuffles both decks
  * - Draws 5 cards per player with basic Pokemon guarantee
  * - Does NOT auto-assign active Pokemon (players must select)
- * - Rolls dice for turn order
+ * - Rolls dice for turn order (or uses forcedDiceRoll if provided, e.g. from the PvP server)
  */
 export function createInitialState(
   player1Deck: TcgCard[],
   player2Deck: TcgCard[],
   player1Id: string,
   player2Id: string,
+  forcedDiceRoll?: number,
 ): GameState {
   const shuffled1 = shuffleArray(player1Deck);
   const shuffled2 = shuffleArray(player2Deck);
@@ -158,7 +159,7 @@ export function createInitialState(
     deck: p2Result.deck,
   };
 
-  const dice = rollDice();
+  const dice = forcedDiceRoll ?? rollDice();
   const turnOrder = [player1Id, player2Id];
   const firstPlayer = determineFirstPlayer(dice, turnOrder);
 
@@ -174,7 +175,7 @@ export function createInitialState(
     turnOrder,
     log: [
       'Nueva partida iniciada.',
-      `Dado: ${dice} — ${dice % 2 === 0 ? 'Par' : 'Impar'} — Empieza ${firstPlayer === player1Id ? 'Jugador' : 'Rival'}.`,
+      `Dado: ${dice} — ${dice % 2 === 0 ? 'Par' : 'Impar'} — Empieza ${firstPlayer === player1Id ? 'Jugador 1' : 'Jugador 2'}.`,
     ],
     gamePhase: 'setup',
     diceRoll: dice,

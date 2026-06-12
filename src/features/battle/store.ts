@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { DeckType, Difficulty } from './types';
 import type { GameState as LegacyGameState } from './types';
 import type { Card } from '../cards/types';
-import type { GameState as TcgGameState, TcgCard, PokemonCard } from '../../tcg-engine/types';
+import type { GameState as TcgGameState, TcgCard, PokemonCard, GamePhase } from '../../tcg-engine/types';
 import {
   drawCard,
   attachEnergy,
@@ -413,7 +413,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
 
         // In PvP: we don't transition to battle until bench is selected.
         // If there are no basics to put on bench, we can transition if opponent has active.
-        let nextGamePhase = state.tcgState.gamePhase;
+        let nextGamePhase: GamePhase = state.tcgState.gamePhase;
         let nextPendingAction: BattleStoreState['pendingAction'] = 'none';
 
         if (remainingBasics.length > 0) {
@@ -506,7 +506,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
           log: [
             ...state.tcgState.log,
             ...(bench.length > 0
-              ? [`${bench.map((c) => c.name).join(', ')} fueron a la banca.`]
+              ? [`${bench.map((c) => c.card.name).join(', ')} fueron a la banca.`]
               : ['Elegiste no poner cartas en la banca.']),
           ],
         };
@@ -796,7 +796,9 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
         const pvpOpponentId = 'opponent';
         const newMatchCounter = state.matchCounter + 1;
 
-        const tcgState = createInitialState(playerDeck, opponentDeck, pvpPlayerId, pvpOpponentId);
+        // Use the shared dice roll from the server so both clients get the same turn order
+        const serverDiceRoll = state.pvpMatchInfo?.diceRoll;
+        const tcgState = createInitialState(playerDeck, opponentDeck, pvpPlayerId, pvpOpponentId, serverDiceRoll);
 
         // In PvP: do NOT auto-select active for opponent (they select on their client)
         return {
@@ -888,7 +890,7 @@ export function createBattleStore(npcService: NpcService = createNpcService()) {
             log: [
               ...state.tcgState.log,
               ...(bench.length > 0
-                ? [`Rival puso ${bench.map((c) => c.name).join(', ')} en la banca.`]
+                ? [`Rival puso ${bench.map((c) => c.card.name).join(', ')} en la banca.`]
                 : []),
             ],
           };
