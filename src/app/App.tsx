@@ -238,9 +238,6 @@ export function App() {
   const [playerName, setPlayerName] = useState('Jugador');
   const [showResult, setShowResult] = useState(false);
   const [showConfirmExit, setShowConfirmExit] = useState(false);
-  const [navigationPath, setNavigationPath] = useState<Array<{ timestamp: string; username: string; view: string }>>([
-    { timestamp: new Date().toLocaleString(), username: 'Jugador', view: 'name-entry' }
-  ]);
   const [focusedArea] = useState<'hand' | 'actions'>('hand');
   const [focusedHandIndex] = useState(0);
   const [focusedActionIndex] = useState(0);
@@ -312,28 +309,8 @@ export function App() {
     src.start(0);
   };
 
-  const handleNavigate = (nextView: AppView, customName?: string) => {
-    const activeName = customName !== undefined ? customName : playerName;
-    const logTime = new Date().toLocaleString();
-    setNavigationPath((prev) => [...prev, { timestamp: logTime, username: activeName, view: nextView }]);
+  const handleNavigate = (nextView: AppView) => {
     setView(nextView);
-  };
-
-  const handleDownloadLogsCSV = () => {
-    const headers = ['Fecha y hora de inicio de prueba', 'Nombre de usuario', 'Ruta de las opciones que escoje'];
-    const rows = navigationPath.map(item => [item.timestamp, item.username, item.view]);
-    const csvContent = [
-      headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
-      ...rows.map(row => row.map(r => `"${r.replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `log_prueba_${playerName.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   useEffect(() => {
@@ -735,7 +712,7 @@ export function App() {
             setPlayerName(name);
             setStorePlayerName(name);
             unlockAudio();
-            handleNavigate('menu', name);
+            handleNavigate('menu');
           }}
         />
       ) : null}
@@ -1149,14 +1126,14 @@ export function App() {
           <div className="confirm-overlay__backdrop" onClick={() => setShowConfirmExit(false)} />
           <div className="confirm-panel">
             <h2>⚠️ Confirmación</h2>
-            <p>¿Estás seguro de que deseas terminar la prueba? Al confirmar, se descargará un archivo CSV con el reporte del log de navegación de esta sesión.</p>
+            <p>¿Estás seguro de que deseas terminar la prueba? Al confirmar, volverás a la pantalla de ingreso de nombre.</p>
             <div className="confirm-actions">
               <button
                 type="button"
                 className="primary-action danger-action"
                 onClick={() => {
                   setShowConfirmExit(false);
-                  handleDownloadLogsCSV();
+                  handleNavigate('name-entry');
                 }}
                 style={{ padding: '12px 24px' }}
               >
