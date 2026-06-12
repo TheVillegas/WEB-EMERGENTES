@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { loadCards, parseCatalogCsv } from '../features/cards/cardRepository';
+//import { loadCards, parseCatalogCsv } from '../features/cards/cardRepository';
 import { useBattleStore } from '../features/battle/store';
-import type { Battler, GameState, TurnPhase } from '../features/battle/types';
+//import type { Battler } from '../features/battle/types';
+import type { GameState, TurnPhase } from '../features/battle/types';
 import type { PvpMatchInfo } from '../features/multiplayer/multiplayerService';
-import type { TcgCard, PokemonCard, TrainerCard } from '../tcg-engine/types';
+import type { PokemonCard, TrainerCard } from '../tcg-engine/types';
 import { isPokemonCard, isTrainerCard, validateAttackCost } from '../tcg-engine/engine';
 import { isBasicPokemon } from '../tcg-engine/state';
-import { getRequiredTargets } from '../tcg-engine/trainerEffects';
 import { ThreeArena } from '../game/ThreeArena';
 import { CatalogPage } from '../features/catalog/CatalogPage';
 import { MainMenu } from './MainMenu';
@@ -44,22 +44,7 @@ function getPhaseLabel(phase: TurnPhase, match: GameState, isPvp: boolean): stri
   return 'Resolución';
 }
 
-function formatLogEntry(entry: string): string {
-  // Simplified log formatter
-  if (entry === 'Nueva partida iniciada.') return 'La arena digital está lista.';
-  if (entry.includes('Victoria')) return 'Victoria.';
-  if (entry.includes('Derrota')) return 'Derrota.';
-  return entry;
-}
 
-function getMatchSummary(match: GameState) {
-  return {
-    damageDealt: 0,
-    damageTaken: 0,
-    turnsPlayed: 1,
-    cardsUsed: 0,
-  };
-}
 
 function ZonePile({ label, count }: { label: string; count?: number }) {
   return (
@@ -79,11 +64,13 @@ function BenchSlot({
   onClick,
   selectable,
   label,
+  retreatCost,
 }: {
   battler: { card: PokemonCard; currentHp: number } | null;
   onClick?: () => void;
   selectable?: boolean;
   label: string;
+  retreatCost?: number;
 }) {
   if (!battler) {
     return (
@@ -114,61 +101,61 @@ function BenchSlot({
         <div className={`bench-slot__hp hp-pill--${hpTone}`}>
           {battler.currentHp}/{battler.card.hp}
         </div>
+        {retreatCost !== undefined && (
+          <div className="bench-slot__retreat-badge" title={`Costo de retirada: ${retreatCost} energía`}>
+            {retreatCost === 0 ? 'Retirada Libre' : `Retirada: ${retreatCost}`}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function ActiveCard({ battler, owner, status }: { battler: Battler; owner: 'player' | 'npc'; status: string }) {
-  const hpRatio = battler.hp > 0 ? Math.max(0, Math.round((battler.currentHp / battler.hp) * 100)) : 0;
-  const energySlots = Math.max(1, Math.max(battler.attackCost, battler.energy));
-  const hpTone = hpRatio <= 25 ? 'danger' : hpRatio <= 55 ? 'warning' : 'safe';
+
+
+type BenchSelectionOverlayProps = {
+  hand: PokemonCard[];
+  maxSelectable: number;
+  onConfirm: (selectedIds: string[]) => void;
+};
+
+function BenchSelectionOverlay({ hand, maxSelectable, onConfirm }: BenchSelectionOverlayProps) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const basics = hand.filter(c => isBasicPokemon(c));
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (prev.length >= maxSelectable) return prev;
+      return [...prev, id];
+    });
+  };
 
   return (
-    <article className={`active-card active-card--${owner}`}>
-      <div className="active-card__image">
-        <img src={battler.imageLarge || battler.imageSmall} alt={`Carta activa de ${battler.name}`} loading="lazy" />
-      </div>
-
-      <div className="active-card__content">
-        <div className="active-card__header">
-          <div>
-            <p className="eyebrow">{status}</p>
-            <h3>{battler.name}</h3>
-          </div>
-          <span className={`hp-pill hp-pill--${hpTone}`}>{battler.currentHp}/{battler.hp} HP</span>
+    <section className="confirm-overlay bench-selection-overlay">
+      <div className="confirm-overlay__backdrop" />
+      <div className="confirm-panel bench-selection-panel">
+        <h2>Selecciona tu Banca</h2>
+        <p className="eyebrow">Puedes elegir hasta 3 Pokémon básicos ({selected.length}/3)</p>
+        <div className="bench-selection-grid">
+          {basics.map((card) => (
+            <div
+              key={card.id}
+              className={`bench-select-card ${selected.includes(card.id) ? 'bench-select-card--selected' : ''}`}
+              onClick={() => toggleSelect(card.id)}
+            >
+              <img src={card.imageSmall} alt={card.name} loading="lazy" />
+              {selected.includes(card.id) && <div className="bench-select-card__check">✓</div>}
+            </div>
+          ))}
         </div>
-
-        <div className="hp-meter">
-          <div className="hp-meter__topline">
-            <span>HP</span>
-            <span>{hpRatio}%</span>
-          </div>
-          <div className="hp-meter__track">
-            <div className={`hp-meter__fill hp-meter__fill--${hpTone}`} style={{ width: `${hpRatio}%` }} />
-          </div>
-        </div>
-
-        <div className="chip-row">
-          <span className="chip chip--accent">{battler.type}</span>
-          <span className="chip">{battler.attackName}</span>
-          <span className="chip">Daño {battler.attackDamage}</span>
-          <span className={`chip ${battler.energy >= battler.attackCost ? 'chip--ready' : ''}`}>Costo {battler.attackCost}</span>
-        </div>
-
-        <div className="energy-row">
-          <span className="eyebrow">Energía</span>
-          <div className="energy-pips">
-            {Array.from({ length: energySlots }).map((_, index) => (
-              <span
-                key={`${battler.id}-energy-${index}`}
-                className={`energy-pip ${index < battler.energy ? 'is-filled' : ''} ${index < battler.attackCost && battler.energy >= battler.attackCost ? 'is-ready' : ''}`}
-              />
-            ))}
-          </div>
+        <div className="confirm-actions">
+          <button className="primary-action" onClick={() => onConfirm(selected)}>
+            {selected.length > 0 ? 'Confirmar Banca' : 'Saltar sin Banca'}
+          </button>
         </div>
       </div>
-    </article>
+    </section>
   );
 }
 
@@ -254,9 +241,9 @@ export function App() {
   const [navigationPath, setNavigationPath] = useState<Array<{ timestamp: string; username: string; view: string }>>([
     { timestamp: new Date().toLocaleString(), username: 'Jugador', view: 'name-entry' }
   ]);
-  const [focusedArea, setFocusedArea] = useState<'hand' | 'actions'>('hand');
-  const [focusedHandIndex, setFocusedHandIndex] = useState(0);
-  const [focusedActionIndex, setFocusedActionIndex] = useState(0);
+  const [focusedArea] = useState<'hand' | 'actions'>('hand');
+  const [focusedHandIndex] = useState(0);
+  const [focusedActionIndex] = useState(0);
   const [showAttackSelector, setShowAttackSelector] = useState(false);
   const [showDiceAnimation, setShowDiceAnimation] = useState(false);
 
@@ -267,10 +254,7 @@ export function App() {
     tcgState,
     playerId,
     opponentId,
-    isPvp,
-    pvpStatus,
-    pvpMatchInfo,
-    selectedDifficulty,
+    //selectedDifficulty,
     pendingAction,
     pendingTrainerIndex,
     setCatalogLoading,
@@ -290,10 +274,13 @@ export function App() {
     resetCurrentMatch,
     setPendingAction,
     setPlayerName: setStorePlayerName,
+    appendBattleLog,
     startPvpSearch,
     cancelPvpSearch,
     disconnectPvp,
+    triggerNpcTurnIfNeeded,
   } = useBattleStore();
+  const { isPvp, pvpMatchInfo, pvpStatus } = useBattleStore();
 
   const [attackFx, setAttackFx] = useState<AttackFx | null>(null);
   const rootRef = useRef<HTMLElement | null>(null);
@@ -307,6 +294,8 @@ export function App() {
   const playerActiveRef = useRef<HTMLDivElement | null>(null);
   const npcActiveRef = useRef<HTMLDivElement | null>(null);
   const previousMatchRef = useRef<GameState | null>(null);
+  const npcTriggeredRef = useRef(false);
+  const attackAvailabilityLogRef = useRef<string | null>(null);
   const resultAudioRef = useRef<HTMLAudioElement | null>(null);
   const battleAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlockedRef = useRef(false);
@@ -383,23 +372,92 @@ export function App() {
   const isSetupPhase = tcgState?.gamePhase === 'setup';
   const playerNeedsToSelectActive = isSetupPhase && tcgPlayer && !tcgPlayer.activeBattler;
   const needsForceSwitch = tcgState?.gamePhase === 'battle' && tcgPlayer && !tcgPlayer.activeBattler && (tcgPlayer.bench.length ?? 0) > 0;
+  const activeAttacks = tcgPlayer?.activeBattler?.card.attacks ?? [];
+  const playerCanBenchBasic =
+    tcgState?.gamePhase === 'battle' &&
+    tcgState.currentTurn === playerId &&
+    !match?.pendingNpc &&
+    !match?.winner &&
+    (tcgPlayer?.bench.length ?? 0) < 3 &&
+    Boolean(tcgPlayer?.hand.some((card) => isPokemonCard(card) && isBasicPokemon(card)));
+  const playerCanSwitchActive =
+    match?.phase === 'player-turn' &&
+    match.turn === 'player' &&
+    !match?.pendingNpc &&
+    !match?.winner &&
+    tcgPlayer?.activeBattler != null &&
+    (tcgPlayer.bench.length ?? 0) > 0;
+
+  const canRetreat =
+    match?.phase === 'player-turn' &&
+    match.turn === 'player' &&
+    !match.pendingNpc &&
+    !needsForceSwitch &&
+    !tcgPlayer?.hasRetreated &&
+    tcgPlayer?.activeBattler != null &&
+    (tcgPlayer.bench.length ?? 0) > 0 &&
+    (tcgPlayer.activeBattler.card.retreatCost === 0 ||
+      Object.values(tcgPlayer.activeBattler.attachedEnergies).reduce((a, b) => a + b, 0) >=
+      tcgPlayer.activeBattler.card.retreatCost);
 
   const playerCanAssignEnergy =
-    match?.phase === 'player-turn' &&
-    match.turn === 'player' &&
-    Boolean(match.playerActive) &&
-    !match.energyAssignedThisTurn &&
-    !match.pendingNpc;
-
-  const playerCanAttack =
-    match?.phase === 'player-turn' &&
-    match.turn === 'player' &&
-    match.playerActive &&
-    !match.pendingNpc &&
-    tcgPlayer?.activeBattler != null;
+    tcgState?.gamePhase === 'battle' &&
+    tcgState.currentTurn === playerId &&
+    (tcgState.turnPhase === 'draw' || tcgState.turnPhase === 'main') &&
+    Boolean(tcgPlayer?.activeBattler) &&
+    !match?.energyAssignedThisTurn &&
+    !match?.pendingNpc &&
+    !match?.winner;
 
   const playerCanPass =
-    match?.phase === 'player-turn' && match.turn === 'player' && !match.pendingNpc && !match.winner;
+    tcgState?.gamePhase === 'battle' &&
+    tcgState.currentTurn === playerId &&
+    !match?.pendingNpc &&
+    !match?.winner &&
+    !needsForceSwitch;
+
+  useEffect(() => {
+    if (!tcgState || isPvp || !match || tcgState.gamePhase !== 'battle' || tcgState.currentTurn !== playerId) {
+      attackAvailabilityLogRef.current = null;
+      return;
+    }
+
+    const activeBattler = tcgPlayer?.activeBattler;
+    if (!activeBattler) {
+      attackAvailabilityLogRef.current = null;
+      return;
+    }
+
+    const legalAttacks = activeBattler.card.attacks.filter((attackCard) =>
+      validateAttackCost(activeBattler, attackCard.cost).valid,
+    );
+
+    let message: string;
+    if (tcgState.turnPhase !== 'main') {
+      message = tcgState.turnNumber === 1
+        ? 'Ataque no disponible: no puedes atacar en el primer turno.'
+        : 'Ataque no disponible: espera a la fase principal.';
+    } else if (legalAttacks.length > 0) {
+      message = `Ataque disponible: ${legalAttacks.map((attackCard) => attackCard.name).join(', ')}.`;
+    } else {
+      message = 'Ataque no disponible: no tienes energía suficiente para atacar.';
+    }
+
+    if (attackAvailabilityLogRef.current !== message) {
+      attackAvailabilityLogRef.current = message;
+      appendBattleLog(message);
+    }
+  }, [
+    appendBattleLog,
+    isPvp,
+    match,
+    playerId,
+    tcgPlayer?.activeBattler,
+    tcgState?.currentTurn,
+    tcgState?.gamePhase,
+    tcgState?.turnNumber,
+    tcgState?.turnPhase,
+  ]);
 
   // Auto draw phase on player's turn
   useEffect(() => {
@@ -422,8 +480,31 @@ export function App() {
     }
   }, [tcgState?.diceRoll]);
 
+  useEffect(() => {
+    if (!tcgState || isPvp || !match) {
+      return;
+    }
+
+    if (tcgState.gamePhase === 'setup') {
+      npcTriggeredRef.current = false;
+      return;
+    }
+
+    if (
+      tcgState.gamePhase === 'battle' &&
+      tcgState.currentTurn === opponentId &&
+      !npcTriggeredRef.current
+    ) {
+      npcTriggeredRef.current = true;
+      const timer = setTimeout(() => {
+        void triggerNpcTurnIfNeeded();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [tcgState?.gamePhase, tcgState?.currentTurn, tcgState?.turnNumber, isPvp, match?.matchId, opponentId, triggerNpcTurnIfNeeded]);
+
   const logEntries = useMemo(() => (tcgState ? tcgState.log.slice(-6).reverse() : []), [tcgState?.log]);
-  const summary = useMemo(() => (match ? getMatchSummary(match) : null), [match]);
+
   const cardOfTheGame = match?.winner === 'player' ? match.playerActive : match?.npcActive;
 
   useEffect(() => {
@@ -450,6 +531,12 @@ export function App() {
     }
     previousMatchRef.current = match;
   }, [match]);
+
+  useEffect(() => {
+    if (match?.phase === 'npc-turn' && !isPvp) {
+      triggerNpcTurnIfNeeded();
+    }
+  }, [match?.phase, isPvp, triggerNpcTurnIfNeeded]);
 
   useEffect(() => {
     if (match?.winner) {
@@ -614,12 +701,14 @@ export function App() {
 
   const handleAttackSelect = (attackIndex: number) => {
     setShowAttackSelector(false);
-    void playerAttack(attackIndex);
+    if (activeAttacks[attackIndex] && tcgPlayer?.activeBattler && validateAttackCost(tcgPlayer.activeBattler, activeAttacks[attackIndex].cost).valid) {
+      void playerAttack(attackIndex);
+    } else {
+      appendBattleLog('Ataque no disponible: esa opción no se puede ejecutar ahora.');
+    }
   };
 
   // Get available attacks for the selector
-  const activeAttacks = tcgPlayer?.activeBattler?.card.attacks ?? [];
-
   return (
     <main className="game-root" ref={rootRef}>
       {/* Catalog overlay */}
@@ -786,17 +875,27 @@ export function App() {
                         key={`player-bench-${i}`}
                         battler={tcgPlayer?.bench[i] ?? null}
                         label={`Banca ${i + 1}`}
-                        selectable={needsForceSwitch || pendingAction === 'select-trainer-target'}
+                        selectable={needsForceSwitch || pendingAction === 'select-trainer-target' || canRetreat || playerCanSwitchActive}
+                        retreatCost={canRetreat ? tcgPlayer?.activeBattler?.card.retreatCost : undefined}
                         onClick={() => {
                           if (needsForceSwitch) {
                             forceSwitchAfterKO(i);
                           } else if (pendingAction === 'select-trainer-target' && pendingTrainerIndex !== null) {
                             playTrainer(pendingTrainerIndex, { target: 'bench', benchIndex: i });
+                          } else if (canRetreat) {
+                            switchActivePokemon(i);
+                          } else if (playerCanSwitchActive) {
+                            switchActivePokemon(i);
                           }
                         }}
                       />
                     ))}
                   </div>
+                  {canRetreat && (
+                    <div className="retreat-hint">
+                      <span className="retreat-hint__text">↑ Toca para retirar a tu activo</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="player-active-slot" ref={playerSlotRef}>
@@ -834,9 +933,22 @@ export function App() {
                         void playerAttack(0);
                       }
                     }}
-                    disabled={!playerCanAttack}
+                    disabled={false}
                   >
                     Atacar{activeAttacks.length > 1 ? ' ▾' : ''}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`secondary-action ${focusedArea === 'actions' && focusedActionIndex === 3 ? 'is-keyboard-focused' : ''}`}
+                    onClick={() => {
+                      if (playerCanBenchBasic) {
+                        setPendingAction('select-bench');
+                      }
+                    }}
+                    disabled={!playerCanBenchBasic}
+                  >
+                    Banca
                   </button>
 
                   <button
@@ -889,7 +1001,7 @@ export function App() {
                 {/* Show hand cards when in setup/selecting or when expanded */}
                 {tcgPlayer && (playerNeedsToSelectActive || match.phase === 'selecting-active') && (
                   <div className="hand-card-row">
-                    {tcgPlayer.hand.map((card, idx) => {
+                    {tcgPlayer.hand.map((card) => {
                       const isBasic = isPokemonCard(card) && isBasicPokemon(card);
                       const isPkmn = isPokemonCard(card);
                       const isTrainer = isTrainerCard(card);
@@ -937,6 +1049,9 @@ export function App() {
                       if (isTrainer) {
                         actionLabel = trainerCard?.type === 'supporter' ? 'Supporter' : 'Item';
                         canPlay = trainerCard?.type === 'supporter' ? !tcgPlayer.hasUsedSupporter : true;
+                      } else if (isPkmn && pokemonCard?.stage === 'basic') {
+                        actionLabel = 'Banca';
+                        canPlay = playerCanBenchBasic;
                       } else if (isPkmn && pokemonCard?.stage !== 'basic') {
                         actionLabel = `Evolución`;
                         canPlay = !tcgPlayer.hasEvolved;
@@ -949,6 +1064,8 @@ export function App() {
                           onClick={() => {
                             if (isTrainer && canPlay) {
                               playTrainer(idx);
+                            } else if (isPkmn && pokemonCard?.stage === 'basic' && canPlay) {
+                              setPendingAction('select-bench');
                             } else if (isPkmn && pokemonCard?.stage !== 'basic' && canPlay) {
                               // Try to evolve the active Pokemon
                               evolve(idx, 'active');
@@ -1016,6 +1133,15 @@ export function App() {
           </>
         ) : null}
       </div>
+
+      {/* Bench Selection overlay */}
+      {pendingAction === 'select-bench' && tcgPlayer && (
+        <BenchSelectionOverlay
+          hand={tcgPlayer.hand as PokemonCard[]}
+          maxSelectable={Math.max(0, 3 - (tcgPlayer.bench.length ?? 0))}
+          onConfirm={(ids) => useBattleStore.getState().selectBenchPokemon(ids)}
+        />
+      )}
 
       {/* Confirm exit modal */}
       {showConfirmExit ? (

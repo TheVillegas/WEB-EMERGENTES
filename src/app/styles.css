@@ -734,6 +734,7 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
   z-index: 20;
   text-align: center;
   padding: 24px;
+  overflow-y: auto;
 }
 
 .menu-backdrop {
@@ -801,6 +802,7 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
   top: 40px;
   left: 40px;
   text-align: left;
+  z-index: 10;
 }
 
 .menu-header h2 {
@@ -816,6 +818,10 @@ h1, h2, h3, .hud-stats strong, .result-stats strong, .damage-badge, .energy-side
   max-width: 900px;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+.deck-grid--expanded {
+  margin-top: 120px;
 }
 
 .deck-card {
@@ -1614,3 +1620,95 @@ button.is-keyboard-focused {
   }
 }
 
+/* ── Retreat Hint & Badge (Bug #2) ───────────────────────── */
+.bench-slot__retreat-badge {
+  font-size: 9px;
+  color: var(--mint);
+  background: rgba(124, 240, 200, 0.1);
+  border: 1px solid rgba(124, 240, 200, 0.3);
+  padding: 2px 6px;
+  border-radius: 999px;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.retreat-hint {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  pointer-events: none;
+  animation: pulseInstruction 2s infinite;
+}
+
+.retreat-hint__text {
+  font-size: 11px;
+  color: var(--cyan);
+  background: rgba(123, 214, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(123, 214, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Bench Selection (Bug #3) ────────────────────────────── */
+.bench-selection-overlay {
+  z-index: 50;
+}
+
+.bench-selection-panel {
+  max-width: 600px;
+}
+
+.bench-selection-grid {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.bench-select-card {
+  position: relative;
+  width: 120px;
+  cursor: pointer;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.bench-select-card img {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+.bench-select-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(124, 240, 200, 0.5);
+}
+
+.bench-select-card--selected {
+  border-color: var(--mint);
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(124, 240, 200, 0.2);
+}
+
+.bench-select-card__check {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  background: var(--mint);
+  color: #000;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+}

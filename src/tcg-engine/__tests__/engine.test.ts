@@ -44,6 +44,10 @@ const testPokemon = (
     weakness: options?.weakness ? (mapType(options.weakness) as PokemonCard['weakness']) : null,
     retreatCost: options?.retreatCost ?? 1,
     isEx: options?.isEx ?? false,
+    stage: 'basic',
+    evolvesFrom: null,
+    imageSmall: '',
+    imageLarge: '',
   };
 };
 
@@ -78,6 +82,51 @@ function createTestState(p1Overrides?: Partial<GameState['players']['p1']>, p2Ov
   ];
 
   const state = createInitialState([...deck1], [...deck2], 'p1', 'p2');
+  
+  // Ensure deterministic turn for tests
+  state.currentTurn = 'p1';
+  state.diceRoll = 2; // Even means p1 went first
+
+  // Since createInitialState no longer auto-assigns active battler, we must do it manually for tests
+  if (state.players.p1.hand.length > 0) {
+    const card = state.players.p1.hand.shift() as PokemonCard;
+    state.players.p1.activeBattler = {
+      card,
+      currentHp: card.hp,
+      attachedEnergies: emptyZone(),
+      status: 'active',
+    };
+  }
+  
+  if (state.players.p1.hand.length > 0) {
+    const card = state.players.p1.hand.shift() as PokemonCard;
+    state.players.p1.bench.push({
+      card,
+      currentHp: card.hp,
+      attachedEnergies: emptyZone(),
+      status: 'bench',
+    });
+  }
+
+  if (state.players.p2.hand.length > 0) {
+    const card = state.players.p2.hand.shift() as PokemonCard;
+    state.players.p2.activeBattler = {
+      card,
+      currentHp: card.hp,
+      attachedEnergies: emptyZone(),
+      status: 'active',
+    };
+  }
+  
+  if (state.players.p2.hand.length > 0) {
+    const card = state.players.p2.hand.shift() as PokemonCard;
+    state.players.p2.bench.push({
+      card,
+      currentHp: card.hp,
+      attachedEnergies: emptyZone(),
+      status: 'bench',
+    });
+  }
 
   if (p1Overrides) {
     state.players.p1 = { ...state.players.p1, ...p1Overrides };
@@ -364,8 +413,8 @@ describe('attack', () => {
     const result = attack(state, 'p1', 0);
     expect(result.success).toBe(true);
     expect(result.state!.players.p1.points).toBe(1);
-    expect(result.state!.players.p2.activeBattler!.card.name).toBe('Machop');
-    expect(result.state!.players.p2.bench).toHaveLength(0);
+    expect(result.state!.players.p2.activeBattler).toBeNull();
+    expect(result.state!.players.p2.bench).toHaveLength(1);
   });
 
   it('awards 2 points for EX KO', () => {

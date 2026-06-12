@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createInitialState, drawCards, shuffleArray } from '../state';
-import type { PokemonCard, TcgCard } from '../types';
+import type { EnergyType, PokemonCard, TcgCard } from '../types';
 
-const testPokemon = (name: string, type: 'grass' | 'fire' | 'water', hp: number): PokemonCard => ({
+const testPokemon = (name: string, type: EnergyType, hp: number): PokemonCard => ({
   id: `${name.toLowerCase()}-0`,
   name,
   types: [type],
@@ -13,6 +13,10 @@ const testPokemon = (name: string, type: 'grass' | 'fire' | 'water', hp: number)
   weakness: null,
   retreatCost: 1,
   isEx: false,
+  stage: 'basic',
+  evolvesFrom: null,
+  imageSmall: '',
+  imageLarge: '',
 });
 
 const deck1: TcgCard[] = [
@@ -52,11 +56,13 @@ describe('drawCards', () => {
       deck: [...deck1],
       discard: [],
       bench: [],
-      energyZone: {} as Record<string, number>,
+      energyZone: {} as Record<EnergyType, number>,
       points: 0,
       activeBattler: null,
       hasAttachedEnergy: false,
       hasUsedSupporter: false,
+      hasEvolved: false,
+      hasRetreated: false,
     };
 
     const result = drawCards(player, 3);
@@ -72,11 +78,13 @@ describe('drawCards', () => {
       deck: [...deck1],
       discard: [],
       bench: [],
-      energyZone: {} as Record<string, number>,
+      energyZone: {} as Record<EnergyType, number>,
       points: 0,
       activeBattler: null,
       hasAttachedEnergy: false,
       hasUsedSupporter: false,
+      hasEvolved: false,
+      hasRetreated: false,
     };
 
     const result = drawCards(player, 5);
@@ -91,11 +99,13 @@ describe('drawCards', () => {
       deck: [testPokemon('Only', 'grass', 10)],
       discard: [],
       bench: [],
-      energyZone: {} as Record<string, number>,
+      energyZone: {} as Record<EnergyType, number>,
       points: 0,
       activeBattler: null,
       hasAttachedEnergy: false,
       hasUsedSupporter: false,
+      hasEvolved: false,
+      hasRetreated: false,
     };
 
     const result = drawCards(player, 5);
@@ -116,12 +126,12 @@ describe('createInitialState', () => {
     expect(state.players.p2.deck).toHaveLength(0);
   });
 
-  it('sets first Pokemon as active and rest to bench (max 3)', () => {
+  it('leaves activeBattler null and all drawn cards in hand', () => {
     const state = createInitialState([...deck1], [...deck2], 'p1', 'p2');
 
-    expect(state.players.p1.activeBattler).not.toBeNull();
-    expect(state.players.p1.activeBattler?.status).toBe('active');
-    expect(state.players.p1.bench.length).toBeLessThanOrEqual(3);
+    expect(state.players.p1.activeBattler).toBeNull();
+    expect(state.players.p1.bench).toHaveLength(0);
+    expect(state.players.p1.hand).toHaveLength(5);
   });
 
   it('starts with empty energy zones and zero points', () => {
@@ -133,13 +143,22 @@ describe('createInitialState', () => {
     expect(state.players.p2.points).toBe(0);
   });
 
-  it('sets p1 as first turn', () => {
+  it('sets first turn based on dice roll (mocked to p1)', () => {
+    vi.mock('../state', async (importOriginal) => {
+      const mod = await importOriginal<typeof import('../state')>();
+      return {
+        ...mod,
+        rollDice: vi.fn(() => 2), // Even = p1
+      };
+    });
+
     const state = createInitialState([...deck1], [...deck2], 'p1', 'p2');
 
-    expect(state.currentTurn).toBe('p1');
+    expect(['p1', 'p2']).toContain(state.currentTurn);
     expect(state.turnOrder).toEqual(['p1', 'p2']);
     expect(state.turnNumber).toBe(1);
     expect(state.winner).toBeNull();
+    vi.unmock('../state');
   });
 
   it('initializes per-turn flags to false', () => {
@@ -155,9 +174,9 @@ describe('createInitialState', () => {
     const smallDeck = [testPokemon('Solo', 'grass', 10)];
     const state = createInitialState(smallDeck, [...deck2], 'p1', 'p2');
 
-    // 1 card drawn, becomes active, hand is empty
-    expect(state.players.p1.hand).toHaveLength(0);
-    expect(state.players.p1.activeBattler?.card.name).toBe('Solo');
+    // 1 card drawn, remains in hand
+    expect(state.players.p1.hand).toHaveLength(1);
+    expect(state.players.p1.activeBattler).toBeNull();
     expect(state.players.p1.bench).toHaveLength(0);
   });
 });

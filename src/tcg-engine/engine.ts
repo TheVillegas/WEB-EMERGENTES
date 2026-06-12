@@ -116,6 +116,7 @@ export function attachEnergy(
     success: true,
     state: {
       ...state,
+      turnPhase: state.turnPhase === 'draw' ? 'main' : state.turnPhase,
       players: {
         ...state.players,
         [playerId]: updatedPlayer,
@@ -305,6 +306,9 @@ export function switchActive(
   }
 
   const player = state.players[playerId];
+  if (player.hasRetreated) {
+    return { success: false, state: null, error: 'Already retreated this turn' };
+  }
   if (player.bench.length === 0) {
     return { success: false, state: null, error: 'No bench Pokemon' };
   }
@@ -334,6 +338,7 @@ export function switchActive(
 
   const updatedPlayer: PlayerState = {
     ...player,
+    hasRetreated: true,
     activeBattler: newActive,
     bench: newBench,
   };
@@ -375,7 +380,11 @@ export function endTurn(state: GameState): GameState {
   };
 
   // Generate energy for the next player (not on their first turn)
-  if (updatedState.turnNumber > 2 || nextPlayer !== state.turnOrder[0]) {
+  // Bug #6: Use diceRoll to determine who actually started (odd = turnOrder[1])
+  const firstPlayer = state.diceRoll
+    ? (state.diceRoll % 2 === 0 ? state.turnOrder[0] : state.turnOrder[1])
+    : state.turnOrder[0];
+  if (nextPlayer !== firstPlayer || updatedState.turnNumber > 2) {
     updatedState = generateEnergy(updatedState, nextPlayer);
   }
 
@@ -389,6 +398,9 @@ export function drawCard(state: GameState, playerId: string): GameState {
 
   const player = state.players[playerId];
   if (player.hand.length >= 10 || player.deck.length === 0) {
+    if (player.deck.length === 0) {
+      return { ...state, log: [...state.log, `${playerId === 'player' ? 'Jugador' : 'Rival'} no tiene cartas en el mazo.`] };
+    }
     return state;
   }
 

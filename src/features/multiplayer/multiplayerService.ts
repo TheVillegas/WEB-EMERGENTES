@@ -12,6 +12,7 @@ export type MultiplayerCallbacks = {
   onWaiting: () => void;
   onMatched: (info: PvpMatchInfo) => void;
   onOpponentSelectActive: (data: { cardId: string; card: any }) => void;
+  onOpponentSelectBench: (data: { cardIds: string[]; cards: any[] }) => void;
   onOpponentAssignEnergy: (data: { target: 'active' | 'bench'; benchIndex?: number }) => void;
   onOpponentAttack: (data: { attackIndex: number }) => void;
   onOpponentPassTurn: () => void;
@@ -95,6 +96,10 @@ export class MultiplayerService {
       this.callbacks?.onOpponentSelectActive(data);
     });
 
+    this.socket.on('pvp:opponent-select-bench', (data) => {
+      this.callbacks?.onOpponentSelectBench(data);
+    });
+
     this.socket.on('pvp:opponent-assign-energy', (data) => {
       this.callbacks?.onOpponentAssignEnergy(data ?? {});
     });
@@ -143,6 +148,11 @@ export class MultiplayerService {
   /** Notify opponent that this player selected their active card */
   emitSelectActive(cardId: string, card: any): void {
     this.socket?.emit('pvp:select-active', { cardId, card });
+  }
+
+  /** Notify opponent that this player selected their initial bench */
+  emitSelectBench(cardIds: string[], cards: any[]): void {
+    this.socket?.emit('pvp:select-bench', { cardIds, cards });
   }
 
   /** Notify opponent that this player assigned energy */

@@ -75,6 +75,13 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('pvp:opponent-select-active', data);
   });
 
+  // --- Relay: player selected their initial bench ---
+  socket.on('pvp:select-bench', (data) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    socket.to(roomId).emit('pvp:opponent-select-bench', data);
+  });
+
   // --- Relay: player assigned energy ---
   socket.on('pvp:assign-energy', (data) => {
     const roomId = socket.data.roomId;
