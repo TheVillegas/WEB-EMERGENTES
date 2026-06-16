@@ -43,6 +43,20 @@ Variables soportadas:
 
 Si el backend tarda demasiado, devuelve JSON inválido o no está levantado, el turno del NPC cae al mock local y la bitácora deja un aviso no bloqueante.
 
+## Multijugador
+
+Para jugar en modo multijugador necesitás levantar el servidor WebSocket en otra terminal:
+
+```bash
+# Terminal 1 — el frontend
+npm run dev
+
+# Terminal 2 — el servidor multijugador
+npm run server
+```
+
+El cliente se conecta automáticamente al servidor cuando está disponible.
+
 ## Tests
 
 ```bash
