@@ -1156,7 +1156,7 @@ export function App() {
                 className="primary-action danger-action"
                 onClick={() => {
                   setShowConfirmExit(false);
-                  handleDownloadLogsCSV();
+                  //handleDownloadLogsCSV();
                 }}
                 style={{ padding: '12px 24px' }}
               >
